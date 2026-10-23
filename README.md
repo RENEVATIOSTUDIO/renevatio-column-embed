@@ -21,19 +21,20 @@ The footer WebGL column on `https://mondragon.framer.website/` is the motion ref
 | Reference card count | 8 |
 | RENEVATIO card count | 9 |
 | Card canvas, before 3D projection | 6 × 8 scene units; exactly 3:4 |
-| Angular speed | −0.222 radians/second |
-| Full turn | 28.3026365188 seconds |
+| Angular speed | −2π/24 radians/second (same direction) |
+| Full turn | 24 seconds |
 | Camera distance / vertical FOV | 52 scene units / 40° |
 | Gap | 0.2 scene units |
 | Bend | 0.8, corresponding to a 48° cylindrical arc |
 | Vertical step / wave amplitude | −3.1 / 1.3 scene units |
-| Hover rotation speed | 18% of normal, with smooth approach/return |
-| Entire-card hover scale | 1.05 from its center |
+| Hover rotation speed | 9% of normal, with smooth approach/return |
+| Entire-card hover scale | 1.09 from its center |
+| Starting phase | 0.19 radians, matching Stephen's supplied startup screenshot |
 | Orb border | Lovable color stops; 1.69 CSS pixels; 8-second turn |
 
 Pixel dimensions change continuously with perspective and editable block dimensions. There is no single fixed projected pixel width or height for a moving card. The underlying canvases are all 6 × 8 units. The complete scene is fitted uniformly to contain all nine cards, including maximum hover growth, within the iframe.
 
-The outline uses a genuine fourth-order superellipse shader and the same outline for hit testing. It does not use CSS `border-radius`. The original reference uses a quadratic corner mask; the superellipse fulfills Stephen's explicit true-squircle requirement. Card curvature, vertical positions, camera perspective, direction, and angular speed follow the measured reference settings.
+The outline uses a genuine fourth-order superellipse shader and the same outline for hit testing. It does not use CSS `border-radius`. The original reference uses a quadratic corner mask; the superellipse fulfills Stephen's explicit true-squircle requirement. Card curvature, vertical positions, camera perspective, and direction follow the measured reference settings. The 24-second turn and revised hover settings are Stephen's approved updates. The formation inversion was canceled; all images remain upright. Reverse faces use mirrored texture coordinates so logos stay readable, with a narrow whole-image blend within roughly two degrees of the card center turning edge-on. Motion starts at the supplied pose after all image loads settle, rather than advancing during loading.
 
 The rotating rim uses the existing Lovable stylesheet's `--orb-rim-stops`, `--carousel-orb-rim-width: 1.69px`, `135deg` starting angle, and `rim-spin 8s linear`. It is rendered along the true squircle boundary. Reduced-motion mode freezes both the column and the rotating rim; enlargement and links remain available.
 

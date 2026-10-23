@@ -1,5 +1,18 @@
 # Validation — 2026-10-22
 
+## Approved motion and readability update
+
+Stephen authorized a 24-second turn, 1.09× hover growth, 9% hover speed, and a subtle readable-backside correction. He then canceled the formation inversion and supplied a new startup screenshot. The existing formation is preserved with a 0.19-radian starting phase fitted to that screenshot. Earlier speed/scale measurements below describe the original release.
+
+- Browser-measured normal angular speed: −0.26179938779915507 rad/s, versus −2π/24 = −0.2617993877991494. This is a 24-second turn in the original direction.
+- Focus interaction uses the same slowdown/growth target as pointer hover. Browser diagnostics settled at speed multiplier 0.0900000769931966 and whole-card scale 1.09000.
+- All nine textures loaded with no failures; no shader or JavaScript warnings/errors in the final local build.
+- Static startup diagnostics report phase 0.19; visual comparison preserves the supplied LevelUp-at-top formation with upright images and corrected readable backside logos.
+- Reverse texture coordinates crossfade as a whole image within approximately ±2° of the card center facing edge-on. This avoids a seam traveling across the curved surface.
+- The revised maximum hover size is included in the existing envelope fit. The scene was visually checked in 320×650 and 700×500 blocks.
+- Initial phase no longer advances while textures load, so the supplied pose is the starting pose after image readiness.
+- Existing links, editor pause, reduced motion, rim colors/timing, and Squarespace snippet remain in place. Squarespace itself was not edited.
+
 ## Passed locally
 
 - Nine project records in the user's original URL order; all nine textures loaded.

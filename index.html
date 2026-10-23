@@ -30,8 +30,8 @@ const PROJECTS = await fetch('./projects.json', {cache:'no-cache'}).then(r=>{if(
 const SETTINGS = Object.freeze({
   width:6, height:8, gap:0.2, bend:0.8,
   verticalStep:-3.1, verticalWave:1.3,
-  radiansPerSecond:-0.222, cameraDistance:52, fieldOfView:40,
-  hoverSpeed:0.18, hoverScale:1.05,
+  radiansPerSecond:-2*Math.PI/24, cameraDistance:52, fieldOfView:40,
+  hoverSpeed:0.09, hoverScale:1.09,
   speedEaseSeconds:0.42, hoverEaseSeconds:0.18,
   squirclePower:4, rimWidthPx:1.69, rimSeconds:8,
   designWidth:392, designHeight:765
@@ -44,8 +44,9 @@ const nav=root.querySelector('nav');
 const status=document.querySelector('#status');
 const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)');
 const forcedStatic=query.get('motion')==='static';
-const initialPhase=Number(query.get('phase')||0);
-const startingPhase=Number.isFinite(initialPhase)?initialPhase:0;
+// Match the supplied startup screenshot: LevelUp at the top, offset slightly right.
+const initialPhase=Number(query.get('phase')??0.19);
+const startingPhase=Number.isFinite(initialPhase)?initialPhase:0.19;
 
 const vertexShader=`
 varying vec2 cardUV;
@@ -60,6 +61,7 @@ uniform vec2 cover;
 uniform float interaction;
 uniform float rimAngle;
 uniform float rimPixels;
+uniform float faceForward;
 varying vec2 cardUV;
 
 vec4 orbColor(float a){
@@ -95,7 +97,10 @@ void main(){
   if(silhouette<0.01)discard;
 
   vec2 imageUV=(cardUV-0.5)*cover+0.5;
-  vec4 image=texture2D(photo,imageUV);
+  // Correct the reverse face without rotating the card or changing its path.
+  // Crossfade only within ~2 degrees of edge-on, where the change is least visible.
+  float front=smoothstep(-0.035,0.035,faceForward);
+  vec4 image=mix(texture2D(photo,vec2(1.0-imageUV.x,imageUV.y)),texture2D(photo,imageUV),front);
   float distancePixels=-field/max(length(vec2(dFdx(field),dFdy(field))),0.00001);
   float rim=(1.0-smoothstep(rimPixels-0.75,rimPixels+0.75,distancePixels))*interaction;
   // CSS conic-gradient convention: 0 degrees points upward, clockwise.
@@ -140,7 +145,7 @@ async function main(){
     const angle=index*2*Math.PI/PROJECTS.length;
     const material=new THREE.ShaderMaterial({
       vertexShader,fragmentShader,
-      uniforms:{photo:{value:null},cover:{value:new THREE.Vector2(1,1)},interaction:{value:0},rimAngle:{value:135},rimPixels:{value:SETTINGS.rimWidthPx*renderer.getPixelRatio()}},
+      uniforms:{photo:{value:null},cover:{value:new THREE.Vector2(1,1)},interaction:{value:0},rimAngle:{value:135},rimPixels:{value:SETTINGS.rimWidthPx*renderer.getPixelRatio()},faceForward:{value:1}},
       transparent:true,side:THREE.DoubleSide,depthWrite:true,
       extensions:{derivatives:true}
     });
@@ -165,6 +170,7 @@ async function main(){
   }
 
   let phase=startingPhase;
+  let motionStarted=false;
   let speed=1;
   let hovered=-1;
   let focused=-1;
@@ -180,6 +186,7 @@ async function main(){
   const raycaster=new THREE.Raycaster();
   const pointer=new THREE.Vector2();
   const worldPoint=new THREE.Vector3();
+  const faceNormal=new THREE.Vector3();
   const meshes=cards.map(c=>c.mesh);
   const stopped=()=>forcedStatic||reduceMotion.matches||editorMode();
   const diagnostics=query.get('debug')==='1';
@@ -252,7 +259,7 @@ async function main(){
     refreshHover();
     const targetSpeed=hovered>=0||focused>=0?SETTINGS.hoverSpeed:1;
     const nextSpeed=targetSpeed+(speed-targetSpeed)*Math.exp(-dt/SETTINGS.speedEaseSeconds);
-    if(!freeze)phase=(phase+SETTINGS.radiansPerSecond*dt*(speed+nextSpeed)*0.5)%(Math.PI*2);
+    if(!freeze&&motionStarted)phase=(phase+SETTINGS.radiansPerSecond*dt*(speed+nextSpeed)*0.5)%(Math.PI*2);
     speed=nextSpeed;
     column.rotation.y=phase;
     let settling=false;
@@ -267,8 +274,16 @@ async function main(){
       card.material.uniforms.rimAngle.value=135+(card.rimTime/SETTINGS.rimSeconds)*360;
     });
     column.updateMatrixWorld(true);
+    // Switch the whole image together at the card center's edge-on position.
+    // Using the center avoids a mirrored seam moving across the curved image.
+    cards.forEach(card=>{
+      worldPoint.setFromMatrixPosition(card.mesh.matrixWorld).sub(camera.position).normalize().negate();
+      faceNormal.set(0,0,1).transformDirection(card.mesh.matrixWorld);
+      card.material.uniforms.faceForward.value=faceNormal.dot(worldPoint);
+    });
     renderer.render(scene,camera);
     if(diagnostics){
+      root.dataset.frameTime=String(time);
       root.dataset.phase=String(phase);
       root.dataset.speed=String(speed);
       root.dataset.hovered=String(hovered);
@@ -276,6 +291,7 @@ async function main(){
       root.dataset.stopped=String(freeze);
       root.dataset.zoom=String(camera.zoom);
       root.dataset.scales=cards.map(c=>c.mesh.scale.x.toFixed(5)).join(',');
+      root.dataset.faces=cards.map(c=>c.material.uniforms.faceForward.value.toFixed(5)).join(',');
       root.dataset.centers=JSON.stringify(cards.map(c=>{
         worldPoint.set(0,0,0).applyMatrix4(c.mesh.matrixWorld).project(camera);
         const r=canvas.getBoundingClientRect();
@@ -331,6 +347,8 @@ async function main(){
   root.dataset.angularSpeed=String(SETTINGS.radiansPerSecond);
   root.dataset.canvasRatio='3:4';
   root.dataset.hoverSpeed=String(SETTINGS.hoverSpeed);
+  // Begin at the requested reference pose after the images are all available.
+  phase=startingPhase;previousTime=0;motionStarted=true;
   resize();wake();
 
   window.addEventListener('pageshow',()=>{previousTime=0;wake()});
