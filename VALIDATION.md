@@ -20,4 +20,11 @@
 - Squarespace's actual editor, actual plan's iframe acceptance, existing page CSS, and existing z-index hierarchy have not been changed or tested. Those require inserting the final snippet in the user's selected block.
 - Narrow **widget** dimensions were tested. The browser's viewport override did not take effect, so this is not a certified physical-phone test.
 - Reduced-motion behavior follows `prefers-reduced-motion`; its static rendering and hover paths were exercised through the local static mode. The user's operating-system accessibility setting was not changed.
-- Nothing has been published until the user approves the dedicated public repository and Pages deployment.
+- The dedicated public repository and Pages deployment were explicitly approved and are now published. Squarespace itself remains unmodified.
+
+## Published verification
+
+- GitHub Pages action 39882821680 succeeded after Pages was enabled.
+- Live URL: https://renevatiostudio.github.io/renevatio-column-embed/ .
+- The live browser reported `ready=true`, `count=9`, no failed textures, all nine requested `_top` links, and no console warnings/errors.
+- The final Squarespace snippet uses this actual hosting URL for the live and static editor frames.

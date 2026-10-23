@@ -39,7 +39,7 @@ The rotating rim uses the existing Lovable stylesheet's `--orb-rim-stops`, `--ca
 
 ## Squarespace installation
 
-After hosting is approved and deployed, copy all of `squarespace-embed.html` into one **Embed Block → Code snippet → Embed Data**. The final file will contain the verified public hosting URL.
+Copy all of `squarespace-embed.html` into one **Embed Block → Code snippet → Embed Data**. The file contains the verified public hosting URL: https://renevatiostudio.github.io/renevatio-column-embed/ .
 
 Resize and place the outer block in Fluid Engine. Its internal canvas has no minimum size, uses the available width and height, and fits its 3D envelope uniformly. Target the actual Squarespace block ID in existing desktop/mobile CSS to set absolute position, width, height, and stacking. The snippet does not set page-level positioning or z-index.
 
@@ -55,6 +55,6 @@ Squarespace documents Embed Blocks on all plans, including manual embed code. Ar
 
 ## Publishing
 
-The proposed dedicated repository is `RENEVATIOSTUDIO/renevatio-column-embed`. A public GitHub repository is required for Pages on GitHub Free. Publishing has not been performed until the user approves this concrete result and public destination. Only this widget, its public image copies, and its source settings are intended for that repository.
+Published with Stephen’s explicit approval to [RENEVATIOSTUDIO/renevatio-column-embed](https://github.com/RENEVATIOSTUDIO/renevatio-column-embed). The verified live page is [the RENEVATIO project column](https://renevatiostudio.github.io/renevatio-column-embed/). A public GitHub repository supports Pages on GitHub Free. Only this widget, its image copies, and its source settings are published. The Squarespace site itself has not been edited.
 
 Sources: [reference](https://mondragon.framer.website/), [Squarespace embeds](https://support.squarespace.com/hc/en-us/articles/206543617-Embed-blocks), [Three.js](https://threejs.org/).
