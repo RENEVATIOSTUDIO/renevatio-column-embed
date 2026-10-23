@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>RENEVATIO — Project Column</title>
+<link rel="icon" href="data:,">
+<style>
+  *,*::before,*::after{box-sizing:border-box}
+  html,body{width:100%;height:100%;margin:0;overflow:hidden;background:transparent}
+  #column{position:absolute;inset:0;overflow:hidden;touch-action:pan-y}
+  canvas{display:block;width:100%;height:100%;outline:none;touch-action:pan-y}
+  .rv-links{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+  #status{position:absolute;inset:0;display:grid;place-content:center;margin:0;padding:12px;font:12px/1.5 system-ui,sans-serif;color:#888;text-align:center;pointer-events:none}
+  #status[hidden]{display:none}
+</style>
+</head>
+<body>
+<main id="column" aria-label="RENEVATIO projects">
+  <canvas aria-label="Nine rotating project cards. Use Tab to select a project." role="img"></canvas>
+  <nav class="rv-links" aria-label="Project links"></nav>
+  <p id="status" role="status">Loading projects…</p>
+</main>
+<script type="module">
+// Edit the nine image URLs and destination links in projects.json.
+// GitHub Pages automatically fetches the image copies during deployment.
+const PROJECTS = await fetch('./projects.json', {cache:'no-cache'}).then(r=>{if(!r.ok)throw Error('Project settings could not load');return r.json()});
+
+const SETTINGS = Object.freeze({
+  width:6, height:8, gap:0.2, bend:0.8,
+  verticalStep:-3.1, verticalWave:1.3,
+  radiansPerSecond:-0.222, cameraDistance:52, fieldOfView:40,
+  hoverSpeed:0.18, hoverScale:1.05,
+  speedEaseSeconds:0.42, hoverEaseSeconds:0.18,
+  squirclePower:4, rimWidthPx:1.69, rimSeconds:8,
+  designWidth:392, designHeight:765
+});
+
+const query = new URLSearchParams(location.search);
+const root=document.querySelector('#column');
+const canvas=root.querySelector('canvas');
+const nav=root.querySelector('nav');
+const status=document.querySelector('#status');
+const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)');
+const forcedStatic=query.get('motion')==='static';
+const initialPhase=Number(query.get('phase')||0);
+const startingPhase=Number.isFinite(initialPhase)?initialPhase:0;
+
+const vertexShader=`
+varying vec2 cardUV;
+void main(){
+  cardUV=uv;
+  gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);
+}`;
+
+const fragmentShader=`
+uniform sampler2D photo;
+uniform vec2 cover;
+uniform float interaction;
+uniform float rimAngle;
+uniform float rimPixels;
+varying vec2 cardUV;
+
+vec4 orbColor(float a){
+  vec4 clear=vec4(0.0);
+  vec4 cyan=vec4(104.0/255.0,232.0/255.0,1.0,0.92);
+  vec4 blue=vec4(90.0/255.0,141.0/255.0,1.0,0.82);
+  vec4 violet=vec4(139.0/255.0,112.0/255.0,1.0,0.76);
+  vec4 pink=vec4(230.0/255.0,125.0/255.0,1.0,0.84);
+  vec4 rose=vec4(1.0,115.0/255.0,151.0/255.0,0.82);
+  vec4 amber=vec4(1.0,155.0/255.0,90.0/255.0,0.88);
+  if(a<12.0)return clear;
+  if(a<28.0)return vec4(cyan.rgb,cyan.a*(a-12.0)/16.0);
+  if(a<43.0)return mix(cyan,blue,(a-28.0)/15.0);
+  if(a<57.0)return mix(blue,violet,(a-43.0)/14.0);
+  if(a<76.0)return vec4(violet.rgb,violet.a*(76.0-a)/19.0);
+  if(a<166.0)return clear;
+  if(a<181.0)return vec4(pink.rgb,pink.a*(a-166.0)/15.0);
+  if(a<197.0)return mix(pink,rose,(a-181.0)/16.0);
+  if(a<214.0)return mix(rose,amber,(a-197.0)/17.0);
+  if(a<234.0)return vec4(amber.rgb,amber.a*(234.0-a)/20.0);
+  return clear;
+}
+vec3 linearColor(vec3 s){
+  return mix(s/12.92,pow((s+0.055)/1.055,vec3(2.4)),step(vec3(0.04045),s));
+}
+void main(){
+  // A fourth-order superellipse: the outline is genuine squircle geometry.
+  vec2 p=cardUV*2.0-1.0;
+  vec2 square=p*p;
+  float field=dot(square,square)-1.0;
+  float aa=max(fwidth(field),0.00001);
+  float silhouette=1.0-smoothstep(-aa*0.5,aa*0.5,field);
+  if(silhouette<0.01)discard;
+
+  vec2 imageUV=(cardUV-0.5)*cover+0.5;
+  vec4 image=texture2D(photo,imageUV);
+  float distancePixels=-field/max(length(vec2(dFdx(field),dFdy(field))),0.00001);
+  float rim=(1.0-smoothstep(rimPixels-0.75,rimPixels+0.75,distancePixels))*interaction;
+  // CSS conic-gradient convention: 0 degrees points upward, clockwise.
+  float angle=mod(degrees(atan(p.x,p.y))-rimAngle+720.0,360.0);
+  vec4 orb=orbColor(angle);
+  float amount=orb.a*rim;
+  vec3 rgb=mix(image.rgb,linearColor(orb.rgb),amount);
+  float alpha=(image.a+amount*(1.0-image.a))*silhouette;
+  gl_FragColor=vec4(rgb,alpha);
+  #include <colorspace_fragment>
+}`;
+
+async function main(){
+  const THREE=await import('./vendor/three.module.js');
+  const renderer=new THREE.WebGLRenderer({canvas,alpha:true,antialias:true,premultipliedAlpha:true,powerPreference:'default'});
+  renderer.setClearColor(0,0);
+  renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
+  renderer.outputColorSpace=THREE.SRGBColorSpace;
+  const scene=new THREE.Scene();
+  const camera=new THREE.PerspectiveCamera(SETTINGS.fieldOfView,1,0.1,2000);
+  camera.position.z=SETTINGS.cameraDistance;
+  const column=new THREE.Group();
+  scene.add(column);
+
+  const geometry=new THREE.PlaneGeometry(SETTINGS.width,SETTINGS.height,32,4);
+  const points=geometry.attributes.position;
+  const arc=SETTINGS.bend*Math.PI/3;
+  const cylinder=SETTINGS.width/arc;
+  for(let i=0;i<points.count;i++){
+    const angle=points.getX(i)/cylinder;
+    points.setXYZ(i,Math.sin(angle)*cylinder,points.getY(i),cylinder*(Math.cos(angle)-1));
+  }
+  geometry.computeVertexNormals();
+  const radius=(SETTINGS.width+SETTINGS.gap)/(2*Math.sin(Math.PI/PROJECTS.length));
+  const loader=new THREE.TextureLoader();
+  loader.setCrossOrigin('anonymous');
+  const cards=[];
+  const links=[];
+
+  for(let index=0;index<PROJECTS.length;index++){
+    const project=PROJECTS[index];
+    const angle=index*2*Math.PI/PROJECTS.length;
+    const material=new THREE.ShaderMaterial({
+      vertexShader,fragmentShader,
+      uniforms:{photo:{value:null},cover:{value:new THREE.Vector2(1,1)},interaction:{value:0},rimAngle:{value:135},rimPixels:{value:SETTINGS.rimWidthPx*renderer.getPixelRatio()}},
+      transparent:true,side:THREE.DoubleSide,depthWrite:true,
+      extensions:{derivatives:true}
+    });
+    const mesh=new THREE.Mesh(geometry,material);
+    mesh.position.set(
+      radius*Math.sin(angle),
+      SETTINGS.verticalStep*(index-(PROJECTS.length-1)/2)+SETTINGS.verticalWave*Math.sin(angle),
+      radius*Math.cos(angle)
+    );
+    mesh.rotation.y=angle;
+    mesh.userData.index=index;
+    mesh.visible=false;
+    column.add(mesh);
+    cards.push({mesh,material,hover:0,rimTime:0,texture:null,loaded:false});
+    const anchor=document.createElement('a');
+    anchor.href=project.link;
+    anchor.target='_top';
+    anchor.textContent=project.name;
+    anchor.addEventListener('focus',()=>{focused=index;wake()});
+    anchor.addEventListener('blur',()=>{focused=-1;wake()});
+    nav.append(anchor);links.push(anchor);
+  }
+
+  let phase=startingPhase;
+  let speed=1;
+  let hovered=-1;
+  let focused=-1;
+  let pointerInside=false;
+  let pointerType='mouse';
+  let pointerX=0,pointerY=0;
+  let active=true;
+  let previousTime=0;
+  let raf=0;
+  let disposed=false;
+  let width=1,height=1;
+  let down=null;
+  const raycaster=new THREE.Raycaster();
+  const pointer=new THREE.Vector2();
+  const worldPoint=new THREE.Vector3();
+  const meshes=cards.map(c=>c.mesh);
+  const stopped=()=>forcedStatic||reduceMotion.matches||editorMode();
+  const diagnostics=query.get('debug')==='1';
+  let editorOverride=false;
+
+  function editorMode(){
+    if(editorOverride)return true;
+    try{
+      if(/(?:\/config(?:\/|$)|[?&](?:sqs-edit-mode|editing)=true)/.test(document.referrer))return true;
+      return parent!==window&&parent.document.documentElement.classList.contains('sqs-edit-mode');
+    }catch{return false}
+  }
+
+  // Fit the complete 3D envelope, including hover growth, inside any block size.
+  // It does not change image proportions, card curvature, or rotation timing.
+  function resize(){
+    const rect=root.getBoundingClientRect();
+    width=Math.max(rect.width,1);height=Math.max(rect.height,1);
+    renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
+    renderer.setSize(width,height,false);
+    camera.aspect=width/height;
+    camera.zoom=1;
+    camera.updateProjectionMatrix();camera.updateMatrixWorld();
+    const oldRotation=column.rotation.y;
+    let maxX=0,maxY=0;
+    for(let sample=0;sample<128;sample++){
+      column.rotation.y=sample*Math.PI*2/128;
+      cards.forEach(c=>c.mesh.scale.setScalar(SETTINGS.hoverScale));
+      column.updateMatrixWorld(true);
+      for(const card of cards){
+        for(let i=0;i<points.count;i++){
+          worldPoint.fromBufferAttribute(points,i).applyMatrix4(card.mesh.matrixWorld).project(camera);
+          maxX=Math.max(maxX,Math.abs(worldPoint.x));
+          maxY=Math.max(maxY,Math.abs(worldPoint.y));
+        }
+      }
+    }
+    camera.zoom=Math.min(1,0.98/Math.max(maxX,maxY,0.001));
+    camera.updateProjectionMatrix();
+    column.rotation.y=oldRotation;
+    cards.forEach(c=>{c.mesh.scale.setScalar(1+(SETTINGS.hoverScale-1)*c.hover);c.material.uniforms.rimPixels.value=SETTINGS.rimWidthPx*renderer.getPixelRatio()});
+    column.updateMatrixWorld(true);
+    wake();
+  }
+
+  function hitAt(clientX,clientY){
+    const r=canvas.getBoundingClientRect();
+    pointer.set(((clientX-r.left)/r.width)*2-1,1-((clientY-r.top)/r.height)*2);
+    raycaster.setFromCamera(pointer,camera);
+    for(const hit of raycaster.intersectObjects(meshes,false)){
+      const card=cards[hit.object.userData.index];
+      if(!card.loaded||!hit.uv)continue;
+      const x=hit.uv.x*2-1,y=hit.uv.y*2-1;
+      if(x*x*x*x+y*y*y*y<=1)return hit.object.userData.index;
+    }
+    return -1;
+  }
+
+  function refreshHover(){
+    hovered=pointerInside&&pointerType!=='touch'?hitAt(pointerX,pointerY):-1;
+    canvas.style.cursor=hovered>=0?'pointer':'default';
+  }
+
+  function tick(time){
+    raf=0;
+    if(disposed||!active||document.hidden){previousTime=0;return}
+    const dt=previousTime?Math.min((time-previousTime)/1000,0.06):0;
+    previousTime=time;
+    const freeze=stopped();
+    refreshHover();
+    const targetSpeed=hovered>=0||focused>=0?SETTINGS.hoverSpeed:1;
+    const nextSpeed=targetSpeed+(speed-targetSpeed)*Math.exp(-dt/SETTINGS.speedEaseSeconds);
+    if(!freeze)phase=(phase+SETTINGS.radiansPerSecond*dt*(speed+nextSpeed)*0.5)%(Math.PI*2);
+    speed=nextSpeed;
+    column.rotation.y=phase;
+    let settling=false;
+    cards.forEach((card,index)=>{
+      const target=index===hovered||index===focused?1:0;
+      card.hover=target+(card.hover-target)*Math.exp(-dt/SETTINGS.hoverEaseSeconds);
+      if(Math.abs(card.hover-target)<0.0001)card.hover=target;
+      else settling=true;
+      card.mesh.scale.setScalar(1+(SETTINGS.hoverScale-1)*card.hover);
+      card.material.uniforms.interaction.value=card.hover;
+      if(target&&!freeze)card.rimTime+=dt;
+      card.material.uniforms.rimAngle.value=135+(card.rimTime/SETTINGS.rimSeconds)*360;
+    });
+    column.updateMatrixWorld(true);
+    renderer.render(scene,camera);
+    if(diagnostics){
+      root.dataset.phase=String(phase);
+      root.dataset.speed=String(speed);
+      root.dataset.hovered=String(hovered);
+      root.dataset.focused=String(focused);
+      root.dataset.stopped=String(freeze);
+      root.dataset.zoom=String(camera.zoom);
+      root.dataset.scales=cards.map(c=>c.mesh.scale.x.toFixed(5)).join(',');
+      root.dataset.centers=JSON.stringify(cards.map(c=>{
+        worldPoint.set(0,0,0).applyMatrix4(c.mesh.matrixWorld).project(camera);
+        const r=canvas.getBoundingClientRect();
+        return {x:(worldPoint.x+1)*width/2+r.left,y:(1-worldPoint.y)*height/2+r.top};
+      }));
+    }
+    if(!freeze||settling)raf=requestAnimationFrame(tick);
+    else previousTime=0;
+  }
+  function wake(){if(!raf&&!disposed){previousTime=0;raf=requestAnimationFrame(tick)}}
+
+  canvas.addEventListener('pointermove',e=>{pointerInside=true;pointerType=e.pointerType;pointerX=e.clientX;pointerY=e.clientY;refreshHover();wake()});
+  canvas.addEventListener('pointerleave',()=>{pointerInside=false;hovered=-1;wake()});
+  canvas.addEventListener('pointerdown',e=>{if(e.button!==0)return;down={x:e.clientX,y:e.clientY,index:hitAt(e.clientX,e.clientY)}});
+  canvas.addEventListener('pointerup',e=>{
+    if(!down)return;
+    const index=hitAt(e.clientX,e.clientY);
+    const same=index===down.index&&index>=0&&Math.hypot(e.clientX-down.x,e.clientY-down.y)<9;
+    down=null;
+    if(same){links[index].click()}
+  });
+  canvas.addEventListener('pointercancel',()=>{down=null});
+  reduceMotion.addEventListener('change',wake);
+  document.addEventListener('visibilitychange',()=>{previousTime=0;if(!document.hidden)wake()});
+  const observer=new IntersectionObserver(entries=>{active=entries.at(-1).isIntersecting;if(active)wake();else previousTime=0});
+  observer.observe(root);
+  const resizeObserver=new ResizeObserver(resize);resizeObserver.observe(root);
+  window.addEventListener('message',event=>{
+    if(event.source!==parent)return;
+    const data=event.data;
+    if(data?.type==='renevatio:editor'&&typeof data.editing==='boolean'){
+      editorOverride=data.editing;wake();
+    }
+  });
+
+  const results=await Promise.allSettled(PROJECTS.map(async(project,index)=>{
+    const texture=await loader.loadAsync(project.texture);
+    texture.colorSpace=THREE.SRGBColorSpace;
+    texture.anisotropy=Math.min(renderer.capabilities.getMaxAnisotropy(),8);
+    const imageRatio=texture.image.width/texture.image.height;
+    const cardRatio=SETTINGS.width/SETTINGS.height;
+    const card=cards[index];
+    card.material.uniforms.cover.value.set(imageRatio>cardRatio?cardRatio/imageRatio:1,imageRatio>cardRatio?1:imageRatio/cardRatio);
+    card.texture=texture;card.material.uniforms.photo.value=texture;card.loaded=true;card.mesh.visible=true;
+    return project.name;
+  }));
+  const failed=results.map((result,i)=>result.status==='rejected'?i+1:null).filter(Boolean);
+  if(failed.length){status.textContent=`Could not load image${failed.length>1?'s':''} ${failed.join(', ')}.`;console.error('Project image loading failed',results.map((r,i)=>r.status==='rejected'?`${i+1}: ${String(r.reason?.message||r.reason?.type||r.reason)}`:null).filter(Boolean).join('; '))}
+  else status.hidden=true;
+  root.dataset.ready='true';
+  root.dataset.count=String(cards.length);
+  root.dataset.failed=failed.join(',');
+  root.dataset.angularSpeed=String(SETTINGS.radiansPerSecond);
+  root.dataset.canvasRatio='3:4';
+  root.dataset.hoverSpeed=String(SETTINGS.hoverSpeed);
+  resize();wake();
+
+  window.addEventListener('pageshow',()=>{previousTime=0;wake()});
+  window.addEventListener('pagehide',event=>{
+    if(event.persisted)return;
+    disposed=true;cancelAnimationFrame(raf);observer.disconnect();resizeObserver.disconnect();
+    cards.forEach(c=>{c.texture?.dispose();c.material.dispose()});geometry.dispose();renderer.dispose();
+  });
+}
+main().catch(error=>{status.textContent='The project column could not start. Please reload.';console.error(error)});
+</script>
+</body>
+</html>

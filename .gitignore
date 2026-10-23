@@ -1,0 +1,7 @@
+_site/
+build-report.json
+*.png
+*.mov
+.DS_Store
+__pycache__/
+RECOVERY_CHECKPOINT.md

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RENEVATIO column — review</title><link rel="icon" href="data:,">
+<style>
+  *{box-sizing:border-box}body{margin:0;background:#080808;color:#eee;font:14px/1.5 system-ui,sans-serif}
+  header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 24px;border-bottom:1px solid #292929;position:relative;z-index:2}
+  header p{margin:0}form{display:flex;gap:12px;align-items:center;flex-wrap:wrap}select{background:#202020;color:#fff;padding:6px;border:1px solid #444}
+  main{min-height:calc(100svh - 65px);display:grid;place-items:center;background:linear-gradient(#080808 0 60%,#fff 60%)}
+  #frame{width:392px;height:765px;max-width:100%;position:relative;resize:both;overflow:hidden}
+  iframe{display:block;width:100%;height:100%;border:0;background:transparent}
+  output{font-size:11px;color:#aaa;font-variant-numeric:tabular-nums}
+  @media(max-width:600px){header{padding:10px;flex-wrap:wrap}#frame{width:100%;height:calc(100svh - 110px)}}
+</style>
+</head>
+<body>
+<header><p>RENEVATIO · Column review</p><form>
+<label>Canvas <select id="size"><option value="392,765">Reference · 392 × 765</option><option value="320,650">Mobile · 320 × 650</option><option value="700,500">Wide · 700 × 500</option><option value="180,400">Small · 180 × 400</option></select></label>
+<label>Motion <select id="mode"><option value="live">Live</option><option value="static">Static / reduced-motion preview</option><option value="editor">Editor mode</option></select></label>
+<output id="metrics">Nine cards · 28.30 sec/turn · 18% hover speed</output>
+</form></header>
+<main><div id="frame"><iframe id="widget" src="index.html?debug=1" title="Nine project cards"></iframe></div></main>
+<script>
+const frame=document.querySelector('#frame'),widget=document.querySelector('#widget');
+document.querySelector('#size').addEventListener('change',e=>{const [w,h]=e.target.value.split(',');frame.style.width=w+'px';frame.style.height=h+'px'});
+document.querySelector('#mode').addEventListener('change',e=>{
+  widget.src=e.target.value==='static'?'index.html?motion=static&debug=1':'index.html?debug=1';
+  widget.onload=()=>{if(e.target.value==='editor')widget.contentWindow.postMessage({type:'renevatio:editor',editing:true},location.origin)};
+});
+</script>
+</body>
+</html>
