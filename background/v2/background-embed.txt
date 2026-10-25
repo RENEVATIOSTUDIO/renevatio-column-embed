@@ -1,0 +1,24 @@
+<style>/* Only these three explicitly marked frames opt into this sizing contract.
+   Squarespace's Fluid Engine grid owns the size. Children never request rows. */
+[data-rv-frame="v2"]{position:absolute!important;inset:0!important;display:block!important;width:auto!important;height:auto!important;min-width:0!important;min-height:0!important;max-width:none!important;max-height:none!important;margin:0!important;padding:0!important;aspect-ratio:auto!important;box-sizing:border-box;overflow:hidden;contain:size layout}
+[data-rv-frame="v2"]>iframe{position:absolute!important;inset:0!important;display:block;width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;max-width:none!important;max-height:none!important;margin:0!important;padding:0!important;border:0!important;aspect-ratio:auto!important;box-sizing:border-box;background:transparent}
+.fe-block:has([data-rv-frame="v2"]){min-width:0!important;min-height:0!important}
+.sqs-block:has([data-rv-frame="v2"]){position:relative;box-sizing:border-box;min-width:0!important;min-height:0!important;padding:0!important}
+.fe-block>.sqs-block:has([data-rv-frame="v2"]){height:100%!important}
+.sqs-block-content:has([data-rv-frame="v2"]){position:absolute!important;inset:0!important;width:auto!important;height:auto!important;min-width:0!important;min-height:0!important;max-width:none!important;max-height:none!important;margin:0!important;padding:0!important;box-sizing:border-box;overflow:clip;contain:size layout;aspect-ratio:auto!important}
+/* Code/Embed intermediate wrappers cannot establish an intrinsic height. */
+.sqs-block-content :has([data-rv-frame="v2"]){position:static!important;height:0!important;min-height:0!important;margin:0!important;padding:0!important;aspect-ratio:auto!important}
+/* Editor status messages stay inside their block rather than adding rows. */
+.sqs-block-content:has([data-rv-frame="v2"])>:not(:has([data-rv-frame="v2"])):not([data-rv-frame="v2"]):not(style):not(script):not(link){position:absolute!important;inset:0!important;min-height:0!important;max-height:100%!important;box-sizing:border-box;overflow:clip}
+.rv-background[data-rv-frame="v2"]{isolation:isolate;background:#000;--rv-field-scale:1;--rv-field-fit:auto;--rv-field-x:0;--rv-field-y:0;--rv-noise-opacity:.15}
+.rv-background[data-rv-frame="v2"]>iframe{pointer-events:none}
+.rv-controls[data-rv-frame="v2"],.rv-project-column[data-rv-frame="v2"]{background:transparent}
+.rv-project-column[data-rv-frame="v2"]>.rv-column-edit{display:none}
+:is(.sqs-edit-mode,.sqs-edit-mode-active) [data-rv-frame="v2"]>iframe{pointer-events:none!important}
+:is(.sqs-edit-mode,.sqs-edit-mode-active) .rv-project-column[data-rv-frame="v2"]>.rv-column-live{display:none}
+:is(.sqs-edit-mode,.sqs-edit-mode-active) .rv-project-column[data-rv-frame="v2"]>.rv-column-edit{display:block}
+</style>
+<div class="rv-background" data-rv-frame="v2" data-rv-embed="background">
+  <iframe src="https://renevatiostudio.github.io/renevatio-column-embed/background/v2/background.html?v=2" title="RENEVATIO background" aria-hidden="true" tabindex="-1" loading="eager"></iframe>
+</div>
+<script src="https://renevatiostudio.github.io/renevatio-column-embed/background/v2/embed-bridge.js?v=2"></script>
