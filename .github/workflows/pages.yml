@@ -23,6 +23,8 @@ jobs:
           python-version: '3.12'
       - name: Refresh image copies
         run: python build.py
+      - name: Include background and controls
+        run: cp -R background _site/background
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
