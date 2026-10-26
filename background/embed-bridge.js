@@ -1,4 +1,9 @@
 (() => {
+  if(!document.querySelector('#rv-motion-controls-shell-v1')){
+    const style=document.createElement('style');style.id='rv-motion-controls-shell-v1';
+    style.textContent='@media (min-width:640px){.rv-controls-shell[data-rv-mount="controls"][data-rv-collapsed="true"]{aspect-ratio:5/1}}';
+    document.head.append(style);
+  }
   const roots=[...document.querySelectorAll('[data-rv-embed]:not([data-rv-bound])')];
   const isEditor=()=>document.documentElement.matches('.sqs-edit-mode,.sqs-edit-mode-active')||!!document.querySelector('body.sqs-edit-mode,body.sqs-edit-mode-active');
   for(const root of roots){
