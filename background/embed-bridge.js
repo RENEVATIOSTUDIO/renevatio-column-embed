@@ -8,7 +8,7 @@
     const configure=()=>{
       const css=getComputedStyle(root),read=(k,f)=>{const v=parseFloat(css.getPropertyValue(k));return Number.isFinite(v)?v:f;};
       post({type:'configure',scale:read('--rv-field-scale',1),x:read('--rv-field-x',0),y:read('--rv-field-y',0),
-        noise:read('--rv-noise-opacity',.15),fit:css.getPropertyValue('--rv-field-fit').trim()||'auto',
+        noise:read('--rv-noise-opacity',.30),fit:css.getPropertyValue('--rv-field-fit').trim()||'auto',
         mobile:matchMedia('(max-width:639px),(pointer:coarse)').matches,static:isEditor()});
     };
     let lastPointer=null,pending=false;
