@@ -2,7 +2,6 @@
 <style>
 .rv-controls-shell[data-rv-mount="controls"] {
   position: relative;
-  z-index: 20;
   display: block;
   width: 100%;
   height: clamp(52px, 18vw, 68px);
@@ -10,53 +9,99 @@
   margin-inline: auto;
   padding: 0;
   overflow: visible;
-  background: transparent;
+  background: transparent !important;
 }
-.rv-controls-shell[data-rv-mount="controls"] > iframe {
+.rv-controls-portal {
+  position: fixed;
+  z-index: 2147483000;
+  display: block;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: transparent !important;
+  isolation: isolate;
+  contain: layout style;
+}
+.rv-controls-portal > iframe {
   position: absolute;
-  top: 0;
-  left: 0;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
   border: 0;
-  background: transparent;
+  background: transparent !important;
   transition: height .18s ease;
 }
-.rv-controls-shell[data-rv-mount="controls"][data-rv-collapsed="false"] {
-  z-index: 2147483000;
-}
-.rv-controls-shell[data-rv-mount="controls"][data-rv-collapsed="false"] > iframe {
-  height: min(460px, 115vw);
+.rv-controls-portal[data-rv-visible="false"] {
+  visibility: hidden;
+  pointer-events: none;
 }
 @media (max-width: 639px) {
   .rv-controls-shell[data-rv-mount="controls"] {
     height: 52px;
   }
-  .rv-controls-shell[data-rv-mount="controls"][data-rv-collapsed="false"] > iframe {
-    height: 232px;
-  }
 }
 @media (prefers-reduced-motion: reduce) {
-  .rv-controls-shell[data-rv-mount="controls"] > iframe { transition: none; }
+  .rv-controls-portal > iframe { transition: none; }
 }
 </style>
 <script>
 (() => {
-  if (window.__rvControlsMountV3) return;
-  window.__rvControlsMountV3 = true;
-  const src = 'https://renevatiostudio.github.io/renevatio-column-embed/background/controls.html?v=4';
+  if (window.__rvControlsMountV4) return;
+  window.__rvControlsMountV4 = true;
+  const src = 'https://renevatiostudio.github.io/renevatio-column-embed/background/controls.html?v=5';
   const selector = '.rv-controls-shell[data-rv-mount="controls"]';
+  const instances = new Set();
+
+  function position(instance) {
+    const { root, portal } = instance;
+    if (!root.isConnected) {
+      portal.remove();
+      instances.delete(instance);
+      return;
+    }
+    const rect = root.getBoundingClientRect();
+    const visible = rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < innerHeight && rect.right > 0 && rect.left < innerWidth;
+    portal.dataset.rvVisible = String(visible);
+    portal.style.left = rect.left + 'px';
+    portal.style.top = rect.top + 'px';
+    portal.style.width = rect.width + 'px';
+    portal.style.height = (instance.collapsed ? rect.height : instance.expandedHeight) + 'px';
+  }
+
+  function sendLayoutContext(instance) {
+    instance.frame.contentWindow?.postMessage({ rv:'controls-layout-context-v1', mobile:innerWidth <= 639 }, '*');
+  }
+
+  let frameRequested = false;
+  function positionAll() {
+    if (frameRequested) return;
+    frameRequested = true;
+    requestAnimationFrame(() => {
+      frameRequested = false;
+      instances.forEach(position);
+    });
+  }
 
   function mount(root) {
     if (root.dataset.rvMounted === 'true') return;
     root.dataset.rvMounted = 'true';
     root.dataset.rvCollapsed = 'true';
+    const portal = document.createElement('div');
+    portal.className = 'rv-controls-portal';
+    portal.dataset.rvCollapsed = 'true';
     const frame = document.createElement('iframe');
     frame.src = src;
     frame.title = 'RENEVATIO controls';
     frame.loading = 'eager';
-    root.append(frame);
+    frame.setAttribute('allowtransparency', 'true');
+    portal.append(frame);
+    document.body.append(portal);
+    const instance = { root, portal, frame, collapsed: true, expandedHeight: 320 };
+    instances.add(instance);
+    frame.addEventListener('load', () => sendLayoutContext(instance));
+    new ResizeObserver(positionAll).observe(root);
+    position(instance);
   }
   function scan(scope = document) {
     if (scope.matches?.(selector)) mount(scope);
@@ -66,10 +111,30 @@
     scan();
     window.addEventListener('message', event => {
       if (event.data?.rv !== 'controls-layout-v1') return;
-      document.querySelectorAll(selector).forEach(root => {
-        const frame = root.querySelector('iframe');
-        if (frame && event.source === frame.contentWindow) {
-          root.dataset.rvCollapsed = String(Boolean(event.data.collapsed));
+      instances.forEach(instance => {
+        if (event.source !== instance.frame.contentWindow) return;
+        instance.collapsed = Boolean(event.data.collapsed);
+        if (Number.isFinite(event.data.expandedHeight)) instance.expandedHeight = Math.max(instance.root.offsetHeight, event.data.expandedHeight);
+        instance.root.dataset.rvCollapsed = String(instance.collapsed);
+        instance.portal.dataset.rvCollapsed = String(instance.collapsed);
+        position(instance);
+      });
+    });
+    window.addEventListener('resize', () => {
+      positionAll();
+      instances.forEach(sendLayoutContext);
+    }, { passive: true });
+    window.addEventListener('scroll', positionAll, { passive: true, capture: true });
+    window.addEventListener('keydown', event => {
+      if (event.key !== 'Escape') return;
+      instances.forEach(instance => {
+        if (!instance.collapsed) instance.frame.contentWindow.postMessage({ rv:'controls-set-collapsed-v1', collapsed:true }, '*');
+      });
+    });
+    document.addEventListener('pointerdown', event => {
+      instances.forEach(instance => {
+        if (!instance.collapsed && !instance.portal.contains(event.target) && !instance.root.contains(event.target)) {
+          instance.frame.contentWindow.postMessage({ rv:'controls-set-collapsed-v1', collapsed:true }, '*');
         }
       });
     });
