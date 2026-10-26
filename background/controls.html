@@ -1,62 +1,58 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>RENEVATIO controls</title><style>@font-face{font-family:RVModica;src:url('assets/modica-light.otf') format('opentype');font-weight:300;font-display:block}
 @font-face{font-family:RVLCD;src:url('assets/jd-lcd-rounded.woff2') format('woff2');font-weight:400;font-display:block}
-*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:transparent;overflow:hidden;color-scheme:dark}
-:root{--rv-label:#c4c4c7;--rv-line:#96989b;--rv-dim:#383a3c;--rv-panel:rgba(0,0,0,.30);--rv-radius:22px}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;background:transparent;overflow:hidden;color-scheme:dark}
+:root{--rv-white:#fff;--rv-label:rgba(255,255,255,.78);--rv-line:rgba(255,255,255,.72);--rv-dim:rgba(255,255,255,.24);--rv-glass:rgba(255,255,255,.08);--rv-border:rgba(255,255,255,.24);--rv-radius:20px}
 
-/*
- * Default / desktop composition: a 1:1 panel with three stacked rows.
- * Each row follows the Framer reference hierarchy: label and value on top,
- * then the complete Hairline drawing underneath. The drawing engine and its
- * interaction surface are unchanged; only its responsive composition moves.
- */
-#panel{position:relative;width:100%;height:100%;min-height:0;background:var(--rv-panel);border:1px solid rgba(255,255,255,.34);border-radius:var(--rv-radius);overflow:hidden;padding:7%;display:grid;grid-template-rows:auto minmax(0,1fr);gap:5%;isolation:isolate;container-type:size;transition:background-color .28s ease,border-color .28s ease}
-#panel::after{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;padding:1px;background:conic-gradient(from var(--rim-angle,135deg),transparent 0deg,transparent 76deg,#78aeb4 103deg,#8a829b 127deg,transparent 148deg,transparent 254deg,#a88c76 284deg,transparent 310deg);mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask-composite:exclude;-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;opacity:var(--rim-opacity,0);z-index:2}
+/* The trigger occupies the Squarespace block. The control tray is an absolute
+   overlay inside the expanded iframe, so opening it never changes page flow. */
+#panel{position:relative;width:100%;height:auto;min-height:0;color:var(--rv-white);isolation:isolate;container-type:inline-size}
 .glass-defs{position:absolute;pointer-events:none}
-.panel-header{display:flex;align-items:center;min-width:0;min-height:0}
-.panel-toggle{--stretch-x:1;--stretch-y:1;--pill-shift-x:0px;position:relative;display:flex!important;align-items:center;width:100%;min-width:0;height:clamp(48px,16cqh,76px);padding:clamp(7px,2.2cqh,12px);gap:clamp(10px,3.2cqw,18px);border:1px solid rgba(255,255,255,.78);border-radius:999px;background:rgba(0,0,0,.30);color:#fff;cursor:pointer;overflow:hidden;isolation:isolate;transform:translateX(var(--pill-shift-x)) scale(var(--stretch-x),var(--stretch-y));transform-origin:center;will-change:transform;box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 12px 35px rgba(0,0,0,.18);backdrop-filter:url(#rv-pill-distortion) blur(3px) saturate(180%);-webkit-backdrop-filter:blur(3px) saturate(180%)}
-.panel-toggle::before{content:'';position:absolute;inset:-18%;z-index:-1;background:radial-gradient(circle at var(--pill-light-x,30%) var(--pill-light-y,25%),rgba(255,255,255,.20),transparent 34%),linear-gradient(110deg,rgba(120,174,180,.08),rgba(138,130,155,.10),rgba(168,140,118,.08));filter:url(#rv-pill-distortion);opacity:.8}
-.pill-icon{flex:0 0 auto;display:grid;place-items:center;width:clamp(34px,11cqh,52px);height:clamp(34px,11cqh,52px);border:1px solid rgba(255,255,255,.26);border-radius:50%;background:rgba(255,255,255,.035);overflow:hidden}
-.pill-icon img{display:block;width:78%;height:78%;object-fit:contain}
-.pill-label{min-width:0;flex:1;font-family:RVLCD,monospace;font-size:clamp(9px,min(4.2cqw,4.2cqh),17px);font-weight:400;line-height:1;letter-spacing:.20em;text-align:left;white-space:nowrap}
-.pill-caret{flex:0 0 auto;width:clamp(8px,2.8cqw,13px);height:clamp(8px,2.8cqw,13px);margin-right:clamp(4px,1.5cqw,9px);border-top:1px solid currentColor;border-left:1px solid currentColor;transform:translateY(18%) rotate(45deg);transition:transform .28s cubic-bezier(.2,.8,.2,1)}
+.panel-header{position:relative;z-index:2;width:100%}
+.panel-toggle{position:relative;display:flex!important;align-items:center;width:100%;height:clamp(52px,18cqw,68px);min-width:0;padding:8px 12px;gap:12px;border:1px solid var(--rv-border);border-radius:var(--rv-radius);background:var(--rv-glass);color:#fff;cursor:pointer;overflow:hidden;box-shadow:none;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);transition:background-color .18s ease,border-color .18s ease}
+.panel-toggle:hover{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.34)}
+.panel-toggle:active{background:rgba(255,255,255,.15)}
 .panel-toggle:focus-visible{outline:1px solid #fff;outline-offset:3px}
+.pill-icon{flex:0 0 auto;display:grid;place-items:center;width:clamp(36px,12cqw,48px);height:clamp(36px,12cqw,48px);border:1px solid var(--rv-border);border-radius:14px;background:rgba(255,255,255,.06);overflow:hidden}
+.pill-icon img{display:block;width:78%;height:78%;object-fit:contain}
+.pill-label{min-width:0;flex:1;font-family:RVLCD,monospace;font-size:clamp(10px,4.1cqw,16px);font-weight:400;line-height:1;letter-spacing:.18em;text-align:left;white-space:nowrap}
+.pill-caret{flex:0 0 auto;width:11px;height:11px;margin-right:8px;border-right:1px solid currentColor;border-bottom:1px solid currentColor;transform:translateY(-2px) rotate(45deg);transition:transform .2s ease}
+#panel[data-collapsed="false"] .pill-caret{transform:translateY(3px) rotate(225deg)}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-.controls-list{display:grid;grid-template-rows:repeat(3,minmax(0,1fr));gap:4%;min-width:0;min-height:0}
-.control{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto minmax(0,1fr);column-gap:10%;row-gap:7%;align-items:center;min-width:0;min-height:0;margin:0;padding:0;border:0}
-.name{font-family:RVModica,sans-serif;font-weight:300;font-size:clamp(9px,min(4cqw,4cqh),20px);letter-spacing:.19em;color:var(--rv-label);line-height:1;white-space:nowrap;align-self:center}
-.track{position:relative;grid-column:1/-1;grid-row:2;height:100%;min-height:0;width:100%;touch-action:pan-y;overflow:clip}
+
+.controls-list{position:absolute;z-index:1;top:calc(100% + 10px);left:0;width:100%;height:clamp(245px,100cqw,390px);padding:20px;display:grid;grid-template-rows:repeat(3,minmax(0,1fr));gap:12px;background:var(--rv-glass);border:1px solid var(--rv-border);border-radius:var(--rv-radius);box-shadow:none;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);transform-origin:top center;transition:opacity .18s ease,transform .18s ease,visibility .18s step-start}
+#panel[data-collapsed="true"] .controls-list{opacity:0;visibility:hidden;pointer-events:none;transform:translateY(-6px) scale(.985);transition:opacity .14s ease,transform .14s ease,visibility 0s step-end .14s}
+.control{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto minmax(0,1fr);column-gap:12px;row-gap:4px;align-items:center;min-width:0;min-height:0;margin:0;padding:0;border:0}
+.name{font-family:RVModica,sans-serif;font-weight:300;font-size:clamp(10px,4cqw,15px);letter-spacing:.17em;color:var(--rv-label);line-height:1;white-space:nowrap}
+output{font-family:RVLCD,monospace;font-weight:400;font-size:clamp(16px,7cqw,30px);line-height:1;color:#fff;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;min-width:3ch;justify-self:end;pointer-events:none;opacity:.72}
+output::after{content:'%';font-family:Arial,sans-serif;font-size:.34em;margin-left:.2em;color:var(--rv-label);vertical-align:.18em}
+.track{position:relative;grid-column:1/-1;grid-row:2;width:100%;height:100%;min-height:0;touch-action:pan-y;overflow:clip}
 .track svg{display:block;width:100%;height:100%;overflow:visible;pointer-events:none}
 .track path,.track line{fill:none;stroke:var(--rv-line);stroke-width:1;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
-.track .lo{stroke:var(--rv-dim)}.track .hi{stroke:#e8e9eb}
+.track .lo{stroke:var(--rv-dim)}
+.track .hi{stroke:#fff}
 .track .selector{opacity:var(--active-opacity,0)}
-.track input{appearance:none;-webkit-appearance:none;position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;opacity:0;cursor:ew-resize;touch-action:pan-y}
+.track input{appearance:none;-webkit-appearance:none;position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;opacity:0;border:0;background:transparent;cursor:ew-resize;touch-action:pan-y}
 .track input::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:1px;height:min(44px,24vh);background:transparent;border:0}
 .track input::-webkit-slider-runnable-track{height:100%;background:transparent}
 .track input::-moz-range-thumb{width:1px;height:min(44px,24vh);background:transparent;border:0}
 .track input::-moz-range-track{height:100%;background:transparent}
-.track:has(input:focus-visible){outline:1px solid #8c8d90;outline-offset:3px;border-radius:4px}
+.track:has(input:focus-visible){outline:1px solid #fff;outline-offset:2px;border-radius:8px}
 .dash{display:none}
-output{font-family:RVLCD,monospace;font-weight:400;font-size:clamp(15px,min(10cqw,9cqh),46px);line-height:1;color:#e7e8e9;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;min-width:3ch;justify-self:end;align-self:center;pointer-events:none}
-output::after{content:'%';font-family:Arial,sans-serif;font-size:.34em;letter-spacing:0;margin-left:.2em;color:var(--rv-label);vertical-align:.18em}
 
-/*
- * Mobile / wide composition from the reference: three equal control columns.
- * The mount changes to a shallow tray, so each column reads label, value, bar.
- * Aspect-ratio is included so a manually resized Squarespace block also reflows.
- */
-#panel[data-layout="wide"]{padding:4% 4%;border-radius:clamp(12px,3.5vw,22px);grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);gap:7%}
-#panel[data-layout="wide"] .panel-toggle{height:clamp(42px,58cqh,64px)}
-#panel[data-layout="wide"] .controls-list{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:minmax(0,1fr);gap:4%}
-#panel[data-layout="wide"] .control{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);column-gap:0;row-gap:5%;align-content:stretch}
-#panel[data-layout="wide"] .name{grid-column:1;grid-row:1;font-size:clamp(7px,min(2.9cqw,7cqh),13px);letter-spacing:.14em;justify-self:start}
-#panel[data-layout="wide"] output{grid-column:1;grid-row:2;font-size:clamp(13px,min(6cqw,13cqh),30px);justify-self:start;text-align:left}
-#panel[data-layout="wide"] .track{grid-column:1;grid-row:3;min-height:0}
-#panel[data-collapsed="true"]{padding:0;background:transparent;border-color:transparent;grid-template-rows:minmax(0,1fr)}
-#panel[data-collapsed="true"] .controls-list{display:none}
-#panel[data-collapsed="true"] .pill-caret{transform:translateY(-18%) rotate(225deg)}
-#panel[data-layout="wide"][data-collapsed="true"] .panel-header{height:100%}
-#panel[data-layout="wide"][data-collapsed="true"] .panel-toggle{height:100%}
-@media(prefers-reduced-motion:reduce){#panel::after{background:linear-gradient(135deg,#515a61,transparent 40%,transparent 70%,#655c54)}}
+/* Reference mobile arrangement: three equal columns in one floating tray. */
+@media(max-width:639px){
+  :root{--rv-radius:16px}
+  .panel-toggle{height:52px;padding:7px 9px;gap:9px}
+  .pill-icon{width:38px;height:38px;border-radius:12px}
+  .pill-label{font-size:clamp(9px,3.8cqw,13px);letter-spacing:.14em}
+  .controls-list{height:170px;padding:14px;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:minmax(0,1fr);gap:16px}
+  .control{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);column-gap:0;row-gap:5px;align-content:stretch}
+  .name{grid-row:1;font-size:clamp(8px,2.8cqw,11px);letter-spacing:.1em;white-space:normal}
+  output{grid-row:2;justify-self:start;text-align:left;font-size:clamp(15px,5cqw,23px)}
+  .track{grid-column:1;grid-row:3}
+}
+@media(prefers-reduced-motion:reduce){.panel-toggle,.pill-caret,.controls-list{transition:none}}
 </style></head><body><svg class="glass-defs" width="0" height="0" aria-hidden="true"><filter id="rv-pill-distortion" x="-20%" y="-40%" width="140%" height="180%"><feTurbulence type="fractalNoise" baseFrequency=".012 .08" numOctaves="2" seed="11" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="7" xChannelSelector="R" yChannelSelector="G"/></filter></svg><div id="panel" role="group" aria-label="Motion controls"><header class="panel-header"><button id="panel-toggle" class="panel-toggle" type="button" aria-expanded="false" aria-controls="controls-list"><span class="pill-icon"><img src="assets/motion-controls-icon.png" alt=""></span><span class="pill-label">MOTION CONTROLS</span><span class="pill-caret" aria-hidden="true"></span></button></header><div id="controls-list" class="controls-list"><section class="control" data-control="glow"><label class="name" for="glow">GLOW</label><div class="track"><input id="glow" type="range" min="0" max="100" step="1" value="21" aria-label="Glow" /></div><span class="dash" aria-hidden="true"></span><output for="glow" aria-hidden="true">21</output></section><section class="control" data-control="flow"><label class="name" for="flow">FLOW</label><div class="track"><input id="flow" type="range" min="0" max="100" step="1" value="30" aria-label="Flow" /></div><span class="dash" aria-hidden="true"></span><output for="flow" aria-hidden="true">30</output></section><section class="control" data-control="saturation"><label class="name" for="saturation">SATURATION</label><div class="track"><input id="saturation" type="range" min="0" max="100" step="1" value="69" aria-label="Saturation" /></div><span class="dash" aria-hidden="true"></span><output for="saturation" aria-hidden="true">69</output></section></div></div><script>/* hairline kernel sha256:346b48bdef2cdfafd5343eba01494255cf75f9c078e6fcd1aafc62bab62980a1 */
 /*
  * HL: everything a figure may call. Read this index; the code under it is the
