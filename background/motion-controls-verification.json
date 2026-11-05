@@ -1,0 +1,528 @@
+{
+  "results": [
+    {
+      "name": "1440: browser top layer active",
+      "pass": true
+    },
+    {
+      "name": "1440: no iframe inside controls",
+      "pass": true
+    },
+    {
+      "name": "1440: defaults",
+      "pass": true
+    },
+    {
+      "name": "1440: original font assets loaded",
+      "pass": true
+    },
+    {
+      "name": "1440: cycle 1 opens",
+      "pass": true
+    },
+    {
+      "name": "1440: three line drawings visible",
+      "pass": true,
+      "detail": [
+        {
+          "rect": {
+            "x": 776,
+            "y": 12,
+            "width": 420,
+            "height": 110,
+            "top": 12,
+            "right": 1196,
+            "bottom": 122,
+            "left": 776
+          },
+          "display": "grid",
+          "opacity": "1",
+          "delay": "0.12s",
+          "background": "rgba(255, 255, 255, 0.08)",
+          "paths": 5
+        },
+        {
+          "rect": {
+            "x": 776,
+            "y": 130,
+            "width": 420,
+            "height": 110,
+            "top": 130,
+            "right": 1196,
+            "bottom": 240,
+            "left": 776
+          },
+          "display": "grid",
+          "opacity": "1",
+          "delay": "0.06s",
+          "background": "rgba(255, 255, 255, 0.08)",
+          "paths": 5
+        },
+        {
+          "rect": {
+            "x": 776,
+            "y": 248,
+            "width": 420,
+            "height": 110,
+            "top": 248,
+            "right": 1196,
+            "bottom": 358,
+            "left": 776
+          },
+          "display": "grid",
+          "opacity": "1",
+          "delay": "0s",
+          "background": "rgba(255, 255, 255, 0.08)",
+          "paths": 5
+        }
+      ]
+    },
+    {
+      "name": "1440: separate white glass cards",
+      "pass": true,
+      "detail": [
+        {
+          "rect": {
+            "x": 776,
+            "y": 12,
+            "width": 420,
+            "height": 110,
+            "top": 12,
+            "right": 1196,
+            "bottom": 122,
+            "left": 776
+          },
+          "display": "grid",
+          "opacity": "1",
+          "delay": "0.12s",
+          "background": "rgba(255, 255, 255, 0.08)",
+          "paths": 5
+        },
+        {
+          "rect": {
+            "x": 776,
+            "y": 130,
+            "width": 420,
+            "height": 110,
+            "top": 130,
+            "right": 1196,
+            "bottom": 240,
+            "left": 776
+          },
+          "display": "grid",
+          "opacity": "1",
+          "delay": "0.06s",
+          "background": "rgba(255, 255, 255, 0.08)",
+          "paths": 5
+        },
+        {
+          "rect": {
+            "x": 776,
+            "y": 248,
+            "width": 420,
+            "height": 110,
+            "top": 248,
+            "right": 1196,
+            "bottom": 358,
+            "left": 776
+          },
+          "display": "grid",
+          "opacity": "1",
+          "delay": "0s",
+          "background": "rgba(255, 255, 255, 0.08)",
+          "paths": 5
+        }
+      ]
+    },
+    {
+      "name": "1440: correct arrangement",
+      "pass": true,
+      "detail": [
+        {
+          "rect": {
+            "x": 776,
+            "y": 12,
+            "width": 420,
+            "height": 110,
+            "top": 12,
+            "right": 1196,
+            "bottom": 122,
+            "left": 776
+          },
+          "display": "grid",
+          "opacity": "1",
+          "delay": "0.12s",
+          "background": "rgba(255, 255, 255, 0.08)",
+          "paths": 5
+        },
+        {
+          "rect": {
+            "x": 776,
+            "y": 130,
+            "width": 420,
+            "height": 110,
+            "top": 130,
+            "right": 1196,
+            "bottom": 240,
+            "left": 776
+          },
+          "display": "grid",
+          "opacity": "1",
+          "delay": "0.06s",
+          "background": "rgba(255, 255, 255, 0.08)",
+          "paths": 5
+        },
+        {
+          "rect": {
+            "x": 776,
+            "y": 248,
+            "width": 420,
+            "height": 110,
+            "top": 248,
+            "right": 1196,
+            "bottom": 358,
+            "left": 776
+          },
+          "display": "grid",
+          "opacity": "1",
+          "delay": "0s",
+          "background": "rgba(255, 255, 255, 0.08)",
+          "paths": 5
+        }
+      ]
+    },
+    {
+      "name": "1440: cycle 1 closes",
+      "pass": true
+    },
+    {
+      "name": "1440: cycle 2 opens",
+      "pass": true
+    },
+    {
+      "name": "1440: cycle 2 closes",
+      "pass": true
+    },
+    {
+      "name": "1440: cycle 3 opens",
+      "pass": true
+    },
+    {
+      "name": "1440: cycle 3 closes",
+      "pass": true
+    },
+    {
+      "name": "1440: cycle 4 opens",
+      "pass": true
+    },
+    {
+      "name": "1440: cycle 4 closes",
+      "pass": true
+    },
+    {
+      "name": "1440: every external element unchanged on every animation frame",
+      "pass": true,
+      "detail": {
+        "frames": 298
+      }
+    },
+    {
+      "name": "1440: no attributes written outside controls",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "name": "1440: closed cards removed from hit testing",
+      "pass": true
+    },
+    {
+      "name": "1440: escapes transformed and clipped ancestors",
+      "pass": true
+    },
+    {
+      "name": "1440: keyboard adjusts preserved slider",
+      "pass": true
+    },
+    {
+      "name": "1440: keyboard value reaches real background",
+      "pass": true
+    },
+    {
+      "name": "1440: pointer or touch changes real background",
+      "pass": true
+    },
+    {
+      "name": "1440: Escape closes",
+      "pass": true
+    },
+    {
+      "name": "1440: reduced motion has no transitions",
+      "pass": true
+    },
+    {
+      "name": "390: browser top layer active",
+      "pass": true
+    },
+    {
+      "name": "390: no iframe inside controls",
+      "pass": true
+    },
+    {
+      "name": "390: defaults",
+      "pass": true
+    },
+    {
+      "name": "390: original font assets loaded",
+      "pass": true
+    },
+    {
+      "name": "390: cycle 1 opens",
+      "pass": true
+    },
+    {
+      "name": "390: three line drawings visible",
+      "pass": true,
+      "detail": [
+        {
+          "rect": {
+            "x": 24,
+            "y": 216,
+            "width": 108.65625,
+            "height": 142,
+            "top": 216,
+            "right": 132.65625,
+            "bottom": 358,
+            "left": 24
+          },
+          "display": "grid",
+          "opacity": "1",
+          "delay": "0s",
+          "background": "rgba(255, 255, 255, 0.08)",
+          "paths": 5
+        },
+        {
+          "rect": {
+            "x": 140.65625,
+            "y": 216,
+            "width": 108.65625,
+            "height": 142,
+            "top": 216,
+            "right": 249.3125,
+            "bottom": 358,
+            "left": 140.65625
+          },
+          "display": "grid",
+          "opacity": "1",
+          "delay": "0.06s",
+          "background": "rgba(255, 255, 255, 0.08)",
+          "paths": 5
+        },
+        {
+          "rect": {
+            "x": 257.328125,
+            "y": 216,
+            "width": 108.65625,
+            "height": 142,
+            "top": 216,
+            "right": 365.984375,
+            "bottom": 358,
+            "left": 257.328125
+          },
+          "display": "grid",
+          "opacity": "1",
+          "delay": "0.12s",
+          "background": "rgba(255, 255, 255, 0.08)",
+          "paths": 5
+        }
+      ]
+    },
+    {
+      "name": "390: separate white glass cards",
+      "pass": true,
+      "detail": [
+        {
+          "rect": {
+            "x": 24,
+            "y": 216,
+            "width": 108.65625,
+            "height": 142,
+            "top": 216,
+            "right": 132.65625,
+            "bottom": 358,
+            "left": 24
+          },
+          "display": "grid",
+          "opacity": "1",
+          "delay": "0s",
+          "background": "rgba(255, 255, 255, 0.08)",
+          "paths": 5
+        },
+        {
+          "rect": {
+            "x": 140.65625,
+            "y": 216,
+            "width": 108.65625,
+            "height": 142,
+            "top": 216,
+            "right": 249.3125,
+            "bottom": 358,
+            "left": 140.65625
+          },
+          "display": "grid",
+          "opacity": "1",
+          "delay": "0.06s",
+          "background": "rgba(255, 255, 255, 0.08)",
+          "paths": 5
+        },
+        {
+          "rect": {
+            "x": 257.328125,
+            "y": 216,
+            "width": 108.65625,
+            "height": 142,
+            "top": 216,
+            "right": 365.984375,
+            "bottom": 358,
+            "left": 257.328125
+          },
+          "display": "grid",
+          "opacity": "1",
+          "delay": "0.12s",
+          "background": "rgba(255, 255, 255, 0.08)",
+          "paths": 5
+        }
+      ]
+    },
+    {
+      "name": "390: correct arrangement",
+      "pass": true,
+      "detail": [
+        {
+          "rect": {
+            "x": 24,
+            "y": 216,
+            "width": 108.65625,
+            "height": 142,
+            "top": 216,
+            "right": 132.65625,
+            "bottom": 358,
+            "left": 24
+          },
+          "display": "grid",
+          "opacity": "1",
+          "delay": "0s",
+          "background": "rgba(255, 255, 255, 0.08)",
+          "paths": 5
+        },
+        {
+          "rect": {
+            "x": 140.65625,
+            "y": 216,
+            "width": 108.65625,
+            "height": 142,
+            "top": 216,
+            "right": 249.3125,
+            "bottom": 358,
+            "left": 140.65625
+          },
+          "display": "grid",
+          "opacity": "1",
+          "delay": "0.06s",
+          "background": "rgba(255, 255, 255, 0.08)",
+          "paths": 5
+        },
+        {
+          "rect": {
+            "x": 257.328125,
+            "y": 216,
+            "width": 108.65625,
+            "height": 142,
+            "top": 216,
+            "right": 365.984375,
+            "bottom": 358,
+            "left": 257.328125
+          },
+          "display": "grid",
+          "opacity": "1",
+          "delay": "0.12s",
+          "background": "rgba(255, 255, 255, 0.08)",
+          "paths": 5
+        }
+      ]
+    },
+    {
+      "name": "390: cycle 1 closes",
+      "pass": true
+    },
+    {
+      "name": "390: cycle 2 opens",
+      "pass": true
+    },
+    {
+      "name": "390: cycle 2 closes",
+      "pass": true
+    },
+    {
+      "name": "390: cycle 3 opens",
+      "pass": true
+    },
+    {
+      "name": "390: cycle 3 closes",
+      "pass": true
+    },
+    {
+      "name": "390: cycle 4 opens",
+      "pass": true
+    },
+    {
+      "name": "390: cycle 4 closes",
+      "pass": true
+    },
+    {
+      "name": "390: every external element unchanged on every animation frame",
+      "pass": true,
+      "detail": {
+        "frames": 301
+      }
+    },
+    {
+      "name": "390: no attributes written outside controls",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "name": "390: closed cards removed from hit testing",
+      "pass": true
+    },
+    {
+      "name": "390: escapes transformed and clipped ancestors",
+      "pass": true
+    },
+    {
+      "name": "390: keyboard adjusts preserved slider",
+      "pass": true
+    },
+    {
+      "name": "390: keyboard value reaches real background",
+      "pass": true
+    },
+    {
+      "name": "390: pointer or touch changes real background",
+      "pass": true
+    },
+    {
+      "name": "390: Escape closes",
+      "pass": true
+    },
+    {
+      "name": "390: reduced motion has no transitions",
+      "pass": true
+    },
+    {
+      "name": "No runtime errors",
+      "pass": true,
+      "detail": []
+    }
+  ],
+  "errors": []
+}

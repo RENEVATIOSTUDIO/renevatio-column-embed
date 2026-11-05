@@ -1,0 +1,807 @@
+(()=>{/* hairline kernel sha256:346b48bdef2cdfafd5343eba01494255cf75f9c078e6fcd1aafc62bab62980a1 */
+/*
+ * HL: everything a figure may call. Read this index; the code under it is the
+ * package's src/core, unchanged, and a figure should not need to read it.
+ *
+ * Every figure is drawn in a 400 × 320 viewBox. World space is x/y on the
+ * ground and z up. Plates are filled with the ground colour and painted back
+ * to front, so a nearer one covers a farther one: append in that order. At
+ * the default camera, Cam(45, 0.5, S), +x runs down to the right and +y down
+ * to the left, so the corner with the largest x and y is nearest the viewer:
+ * append by ascending x + y, from the far corner (smallest x and y) to it.
+ *
+ * Camera
+ *   Cam(azDeg, k, S)                       a camera: azimuth in degrees, k = sin(elevation) (0.5 is the 2:1 view), S = scale
+ *   fit(C, points, cx, cy)                 centres the box of [x, y, z] points on (cx, cy); call it once, before proj
+ *                                          it only centres, it never scales: choose S by trying values, with the most extreme pose in points.
+ *                                          The six figures use S 1.42 to 2.12; the boxes they fit come out 230 to 310 wide and 180 to 245 tall
+ *   proj(C)                                returns P(x, y, z), which gives [sx, sy]
+ *   unproj(C, sx, sy, z)                   the world [x, y] under a screen point, on the plane at height z
+ *   facing(C)                              returns front(sample): whether a ring sample faces the camera
+ * Rounded solids
+ *   rrect(u0, v0, u1, v1, r, n)            a rounded rectangle, as a ring of samples {u, v, nu, nv}
+ *   circ(R, n)                             a circle, as a ring
+ *   rings(x0, y0, x1, y1, r, b)            [ring, inner]: a rounded footprint and its crease ring, inset by b
+ *                                          r, the corner radius, is cut to half the shorter side. b, the crease's inset in world units
+ *                                          (0.6 to 2.2 in the figures), must stay under half the shorter side or the crease turns inside out
+ *   prism(P, front, ring, inner, z0, z1)   {sil, crease}: a solid standing from z0 to z1, as two path strings
+ *   ringAt(P, ring, z)                     the ring's points, projected at height z
+ *   run(ring, keep)                        the one cyclic run of samples that pass keep
+ *   hull(points)                           the convex hull of screen points
+ *   extremes(P, ring)                      [left, right, nearest] samples: where dashed drops fall from
+ *   fillet(points, radii, n)               rounds every vertex of a closed polygon; returns the new points
+ *                                          radii is an array, one radius per vertex, each cut to half its shorter edge; a single number gives NaN.
+ *                                          n is the steps round each corner, default 4: each vertex becomes n + 1 points
+ *   ghost(P, front, ring, z0, depth)       a reflection's path {d, y0, y1}; reflect() draws it for you
+ * Paths and numbers
+ *   poly(points)                           a closed path string
+ *   open(points)                           an open polyline string
+ *   seg(a, b)                              one segment between two screen points [sx, sy], as its own subpath; project world points with P first
+ *   clamp(v, a, b)
+ *   lerp(a, b, t)
+ *   rad(deg)
+ *   r2(n)                                  two decimals
+ * The continuous clock: one spring per moving number
+ *   spring(x, opts)                        at rest on x; write .t to retarget; opts {k, c, m, eps}, default k 100, c 18, m 1
+ *   stepS(sp, dt)                          advances by dt seconds; returns whether it is still moving
+ * The discrete clock: a 700ms tween on (.32, .72, 0, 1)
+ *   tween(v, dur)                          at rest on v; dur defaults to 700 (ms)
+ *   tset(tw, to, now, delay)               retargets from where it is, after delay ms: the stagger
+ *                                          the same target again does nothing, so calling it on every pointer move is safe
+ *   tval(tw, now)                          its value at now
+ *   tdone(tw, now)                         whether it has landed
+ *   bezier(x1, y1, x2, y2)                 a CSS cubic-bezier, as a function of progress
+ *   EASE_LIFT                              the lift curve itself
+ *   reducedMotion()                        true when the reader asked for less motion; springs and tweens already land at once
+ *   setReducedMotion(on)                   the loop's business, not a figure's
+ * Drawing
+ *   mk(tag, attrs, parent)                 one svg element: the only way a figure makes a node
+ *   solid(parent)                          {g, sil, cr}: a group holding a silhouette path and a crease path
+ *   put(solid, paths)                      writes prism()'s {sil, crease} into solid()'s {sil, cr}: sil into sil, crease into cr
+ *   flatDot(parent, C, r, cls)             a dot lying on the ground plane; cls is "dot", "dot m" or "dot off"
+ *   place(el, point)                       moves a dot or a circle to [sx, sy]
+ *   reflect(svg, parent, P, front, ring, z0, depth)   a fading mirror under a solid
+ *   fade(svg, y0, y1, a0)                  a vertical fade, as a mask; returns the value for a mask attribute
+ * Life
+ *   register(stage, tick)                  joins the one frame loop; tick(dt in seconds, now in ms) returns true to ask for another frame; gives {wake, unregister}
+ *   pointer(stage, handlers)               {move(point), down(point), leave()}, points in viewBox units; returns its disposer
+ *   disposer()                             {add, on, dispose}: collects tear-down, so destroy is bag.dispose
+ * The bench's business, not a figure's
+ *   css(lightDark)
+ *   inject(root)
+ *   tour(stage, stops, onStop)             an unseen pointer that walks the stops, [x, y] in viewBox units or null to leave, and gives way to a real one; onStop(i) on each arrival; returns {stop}
+ *   LAP                                    the default stops: a diamond around the centre, then a leave
+ *
+ * Classes, on path, polygon, ellipse and line. They are the whole palette; a
+ * figure sets no colour, width or fill of its own.
+ *     (none)   filled with the ground colour, medium stroke
+ *     sil      the silhouette's stroke        hi    the bright stroke: the only highlight
+ *     lo       the dim stroke                 nf    no fill        fo   fill only, no stroke
+ *     dash     a dashed guide
+ *     dot      a bright dot                   dot m   a medium dot     dot off   a dim dot
+ */
+var HL = (() => {
+  var __defProp = Object.defineProperty;
+  var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+  var __getOwnPropNames = Object.getOwnPropertyNames;
+  var __hasOwnProp = Object.prototype.hasOwnProperty;
+  var __export = (target, all) => {
+    for (var name in all)
+      __defProp(target, name, { get: all[name], enumerable: true });
+  };
+  var __copyProps = (to, from, except, desc) => {
+    if (from && typeof from === "object" || typeof from === "function") {
+      for (let key of __getOwnPropNames(from))
+        if (!__hasOwnProp.call(to, key) && key !== except)
+          __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+    }
+    return to;
+  };
+  var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+  // packages/hairline/src/core/kernel.ts
+  var kernel_exports = {};
+  __export(kernel_exports, {
+    Cam: () => Cam,
+    EASE_LIFT: () => EASE_LIFT,
+    LAP: () => LAP,
+    bezier: () => bezier,
+    circ: () => circ,
+    clamp: () => clamp,
+    css: () => css,
+    disposer: () => disposer,
+    extremes: () => extremes,
+    facing: () => facing,
+    fade: () => fade,
+    fillet: () => fillet,
+    fit: () => fit,
+    flatDot: () => flatDot,
+    ghost: () => ghost,
+    hull: () => hull,
+    inject: () => inject,
+    lerp: () => lerp,
+    mk: () => mk,
+    open: () => open,
+    place: () => place,
+    pointer: () => pointer,
+    poly: () => poly,
+    prism: () => prism,
+    proj: () => proj,
+    put: () => put,
+    r2: () => r2,
+    rad: () => rad,
+    reducedMotion: () => reducedMotion,
+    reflect: () => reflect,
+    register: () => register,
+    ringAt: () => ringAt,
+    rings: () => rings,
+    rrect: () => rrect,
+    run: () => run,
+    seg: () => seg,
+    setReducedMotion: () => setReducedMotion,
+    solid: () => solid,
+    spring: () => spring,
+    stepS: () => stepS,
+    tdone: () => tdone,
+    tour: () => tour,
+    tset: () => tset,
+    tval: () => tval,
+    tween: () => tween,
+    unproj: () => unproj
+  });
+
+  // packages/hairline/src/core/iso.ts
+  var clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  var lerp = (a, b, t) => a + (b - a) * t;
+  var rad = (d) => d * Math.PI / 180;
+  var r2 = (n) => Math.round(n * 100) / 100;
+  var poly = (pts) => "M" + pts.map((p) => r2(p[0]) + " " + r2(p[1])).join("L") + "Z";
+  var seg = (a, b) => `M${r2(a[0])} ${r2(a[1])}L${r2(b[0])} ${r2(b[1])}`;
+  var open = (pts) => pts.length < 2 ? "" : "M" + pts.map((p) => r2(p[0]) + " " + r2(p[1])).join("L");
+  var Cam = (azDeg, k, S) => ({ az: rad(azDeg), k, S, ox: 0, oy: 0 });
+  function proj(C) {
+    const c = Math.cos(C.az), s = Math.sin(C.az), zf = Math.sqrt(1 - C.k * C.k);
+    return (x, y, z) => {
+      const X = x * c - y * s, Y = x * s + y * c;
+      return [C.ox + C.S * X, C.oy + C.S * (Y * C.k - z * zf)];
+    };
+  }
+  function unproj(C, sx, sy, z) {
+    const c = Math.cos(C.az), s = Math.sin(C.az), zf = Math.sqrt(1 - C.k * C.k);
+    const X = (sx - C.ox) / C.S, Y = ((sy - C.oy) / C.S + z * zf) / C.k;
+    return [X * c + Y * s, -X * s + Y * c];
+  }
+  function fit(C, pts, cx, cy) {
+    C.ox = 0;
+    C.oy = 0;
+    const P = proj(C);
+    let a = 1e9, b = -1e9, c = 1e9, d = -1e9;
+    for (const p of pts) {
+      const q = P(p[0], p[1], p[2]);
+      a = Math.min(a, q[0]);
+      b = Math.max(b, q[0]);
+      c = Math.min(c, q[1]);
+      d = Math.max(d, q[1]);
+    }
+    C.ox = cx - (a + b) / 2;
+    C.oy = cy - (c + d) / 2;
+  }
+  function rrect(u0, v0, u1, v1, r, n = 4) {
+    r = Math.max(0, Math.min(r, (u1 - u0) / 2, (v1 - v0) / 2));
+    const out = [];
+    for (const [cu, cv, a0] of [[u1 - r, v1 - r, 0], [u0 + r, v1 - r, 90], [u0 + r, v0 + r, 180], [u1 - r, v0 + r, 270]])
+      for (let k = 0; k <= n; k++) {
+        const a = rad(a0 + 90 * k / n), ca = Math.cos(a), sa = Math.sin(a);
+        out.push({ u: cu + r * ca, v: cv + r * sa, nu: ca, nv: sa });
+      }
+    return out;
+  }
+  function circ(R, n = 96) {
+    const out = [];
+    for (let k = 0; k < n; k++) {
+      const a = k / n * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a);
+      out.push({ u: R * ca, v: R * sa, nu: ca, nv: sa });
+    }
+    return out;
+  }
+  function hull(input) {
+    const pts = input.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const x = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+    const lo = [], up = [];
+    for (const p of pts) {
+      while (lo.length > 1 && x(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop();
+      lo.push(p);
+    }
+    for (let i = pts.length - 1; i >= 0; i--) {
+      const p = pts[i];
+      while (up.length > 1 && x(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop();
+      up.push(p);
+    }
+    lo.pop();
+    up.pop();
+    return lo.concat(up);
+  }
+  var ringAt = (P, ring, z) => ring.map((q) => P(q.u, q.v, z));
+  var facing = (C) => {
+    const s = Math.sin(C.az), c = Math.cos(C.az);
+    return (q) => q.nu * s + q.nv * c >= -1e-6;
+  };
+  function run(ring, keep) {
+    const n = ring.length;
+    let s = -1;
+    for (let i = 0; i < n; i++) if (keep(ring[i]) && !keep(ring[(i + n - 1) % n])) {
+      s = i;
+      break;
+    }
+    if (s < 0) return keep(ring[0]) ? ring.slice() : [];
+    const out = [];
+    for (let k = 0; k < n && keep(ring[(s + k) % n]); k++) out.push(ring[(s + k) % n]);
+    return out;
+  }
+  function prism(P, front, ring, inner, z0, z1) {
+    return {
+      sil: poly(hull(ringAt(P, ring, z1).concat(ringAt(P, ring, z0)))),
+      crease: inner ? open(ringAt(P, run(inner, front), z1)) : ""
+    };
+  }
+  var rings = (x0, y0, x1, y1, r, b) => [
+    rrect(x0, y0, x1, y1, r),
+    rrect(x0 + b, y0 + b, x1 - b, y1 - b, Math.max(0.3, r - b))
+  ];
+  function extremes(P, ring) {
+    const pr = ring.map((q) => P(q.u, q.v, 0));
+    let a = 0, b = 0, c = 0;
+    pr.forEach((p, k) => {
+      if (p[0] < pr[a][0]) a = k;
+      if (p[0] > pr[b][0]) b = k;
+      if (p[1] > pr[c][1]) c = k;
+    });
+    return [ring[a], ring[b], ring[c]];
+  }
+  function fillet(pts, rs, n = 4) {
+    const m = pts.length, out = [];
+    for (let i = 0; i < m; i++) {
+      const a = pts[(i + m - 1) % m], p = pts[i], b = pts[(i + 1) % m];
+      const la = Math.hypot(a[0] - p[0], a[1] - p[1]), lb = Math.hypot(b[0] - p[0], b[1] - p[1]);
+      const t = Math.min(rs[i], la / 2, lb / 2);
+      const p1 = [p[0] + (a[0] - p[0]) / la * t, p[1] + (a[1] - p[1]) / la * t];
+      const p2 = [p[0] + (b[0] - p[0]) / lb * t, p[1] + (b[1] - p[1]) / lb * t];
+      for (let k = 0; k <= n; k++) {
+        const s = k / n, w = 1 - s;
+        out.push([w * w * p1[0] + 2 * w * s * p[0] + s * s * p2[0], w * w * p1[1] + 2 * w * s * p[1] + s * s * p2[1]]);
+      }
+    }
+    return out;
+  }
+  function ghost(P, front, ring, z0, depth) {
+    const f = run(ring, front), lowP = ringAt(P, f, z0 - depth);
+    return {
+      d: open(lowP) + [f[0], f[f.length - 1]].map((q) => seg(P(q.u, q.v, z0), P(q.u, q.v, z0 - depth))).join(""),
+      y0: Math.min(...ringAt(P, f, z0).map((p) => p[1])),
+      y1: Math.max(...lowP.map((p) => p[1])) + 2
+    };
+  }
+
+  // packages/hairline/src/core/motion.ts
+  var reduced = false;
+  var setReducedMotion = (on) => {
+    reduced = on;
+  };
+  var reducedMotion = () => reduced;
+  function spring(x, o = {}) {
+    return { x, v: 0, t: x, k: o.k ?? 100, c: o.c ?? 18, m: o.m ?? 1, eps: o.eps ?? 0.01 };
+  }
+  function stepS(sp, dt) {
+    if (reduced) {
+      sp.x = sp.t;
+      sp.v = 0;
+      return false;
+    }
+    const n = Math.max(1, Math.ceil(dt * 240)), h = dt / n;
+    for (let i = 0; i < n; i++) {
+      const a = (-sp.k * (sp.x - sp.t) - sp.c * sp.v) / sp.m;
+      sp.v += a * h;
+      sp.x += sp.v * h;
+    }
+    if (Math.abs(sp.x - sp.t) < sp.eps && Math.abs(sp.v) < sp.eps * 10) {
+      sp.x = sp.t;
+      sp.v = 0;
+      return false;
+    }
+    return true;
+  }
+  function bezier(x1, y1, x2, y2) {
+    const cx = 3 * x1, bx = 3 * (x2 - x1) - cx, ax = 1 - cx - bx;
+    const cy = 3 * y1, by = 3 * (y2 - y1) - cy, ay = 1 - cy - by;
+    const X = (u) => ((ax * u + bx) * u + cx) * u;
+    const Y = (u) => ((ay * u + by) * u + cy) * u;
+    const dX = (u) => (3 * ax * u + 2 * bx) * u + cx;
+    return (t) => {
+      if (t <= 0) return 0;
+      if (t >= 1) return 1;
+      let u = t;
+      for (let i = 0; i < 8; i++) {
+        const e = X(u) - t;
+        if (Math.abs(e) < 1e-5) break;
+        const d = dX(u);
+        if (Math.abs(d) < 1e-6) break;
+        u -= e / d;
+      }
+      if (!(u >= 0 && u <= 1) || Math.abs(X(u) - t) > 1e-4) {
+        let lo = 0, hi = 1;
+        u = t;
+        for (let i = 0; i < 24; i++) {
+          if (X(u) < t) lo = u;
+          else hi = u;
+          u = (lo + hi) / 2;
+        }
+      }
+      return Y(u);
+    };
+  }
+  var EASE_LIFT = bezier(0.32, 0.72, 0, 1);
+  var tween = (v, dur = 700) => ({ from: v, to: v, t0: -1e9, dur });
+  var tval = (tw, now) => {
+    const p = clamp((now - tw.t0) / tw.dur, 0, 1);
+    return tw.from + (tw.to - tw.from) * (reduced ? 1 : EASE_LIFT(p));
+  };
+  var tset = (tw, to, now, delay) => {
+    if (tw.to === to) return;
+    tw.from = tval(tw, now);
+    tw.to = to;
+    tw.t0 = now + delay;
+  };
+  var tdone = (tw, now) => reduced || now >= tw.t0 + tw.dur;
+
+  // packages/hairline/src/core/stage.ts
+  var NS = "http://www.w3.org/2000/svg";
+  function mk(tag, attrs, parent) {
+    const e = document.createElementNS(NS, tag);
+    if (attrs) for (const k in attrs) e.setAttribute(k, String(attrs[k]));
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function solid(parent) {
+    const g = mk("g", {}, parent);
+    return { g, sil: mk("path", { class: "sil" }, g), cr: mk("path", { class: "nf lo" }, g) };
+  }
+  var put = (el, s) => {
+    el.sil.setAttribute("d", s.sil);
+    el.cr.setAttribute("d", s.crease);
+  };
+  var flatDot = (parent, C, r, cls) => mk("ellipse", { rx: r2(r * C.S), ry: r2(r * C.S * C.k), class: cls }, parent);
+  var place = (el, q) => {
+    el.setAttribute("cx", String(r2(q[0])));
+    el.setAttribute("cy", String(r2(q[1])));
+  };
+  var fid = 0;
+  function fade(svg, y0, y1, a0 = 0.7) {
+    const id = "hl-fd" + ++fid, defs = mk("defs", {}, svg);
+    const lg = mk("linearGradient", { id: id + "g", gradientUnits: "userSpaceOnUse", x1: 0, y1: r2(y0), x2: 0, y2: r2(y1) }, defs);
+    mk("stop", { offset: 0, "stop-color": "#fff", "stop-opacity": a0 }, lg);
+    mk("stop", { offset: 1, "stop-color": "#fff", "stop-opacity": 0 }, lg);
+    const m = mk("mask", { id, maskUnits: "userSpaceOnUse", x: 0, y: 0, width: 400, height: 320 }, defs);
+    mk("rect", { x: 0, y: 0, width: 400, height: 320, fill: `url(#${id}g)` }, m);
+    return `url(#${id})`;
+  }
+  function reflect(svg, parent, P, front, ring, z0, depth) {
+    const r = ghost(P, front, ring, z0, depth);
+    const gh = mk("g", { class: "ghost", mask: fade(svg, r.y0, r.y1) }, parent);
+    mk("path", { d: r.d }, gh);
+  }
+  var boards = [];
+  var byStage = /* @__PURE__ */ new Map();
+  var raf = 0;
+  var last = 0;
+  var io = null;
+  var rm = null;
+  function frame() {
+    const now = performance.now();
+    const dt = Math.min(0.05, Math.max(0, (now - last) / 1e3));
+    last = now;
+    let any = false;
+    for (const b of boards.slice()) if (b.vis && b.awake) {
+      try {
+        b.awake = !!b.tick(dt, now);
+      } catch (err) {
+        b.awake = false;
+        setTimeout(() => {
+          throw err;
+        });
+      }
+      any = any || b.awake;
+    }
+    raf = any ? requestAnimationFrame(frame) : 0;
+  }
+  function wake(b) {
+    b.awake = true;
+    if (!raf) {
+      last = performance.now();
+      raf = requestAnimationFrame(frame);
+    }
+  }
+  var onMotion = () => {
+    setReducedMotion(!!rm?.matches);
+    boards.forEach(wake);
+  };
+  function start() {
+    if (io) return;
+    io = new IntersectionObserver((es) => {
+      for (const e of es) {
+        const set = byStage.get(e.target);
+        if (!set) continue;
+        for (const b of set) {
+          b.vis = e.isIntersecting;
+          if (b.vis) wake(b);
+        }
+      }
+    }, { rootMargin: "80px" });
+    rm = matchMedia("(prefers-reduced-motion: reduce)");
+    setReducedMotion(rm.matches);
+    rm.addEventListener("change", onMotion);
+  }
+  function stop() {
+    if (raf) cancelAnimationFrame(raf);
+    raf = 0;
+    io?.disconnect();
+    io = null;
+    rm?.removeEventListener("change", onMotion);
+    rm = null;
+  }
+  function register(stage, tick) {
+    start();
+    const b = { stage, tick, vis: false, awake: true };
+    boards.push(b);
+    const peers = byStage.get(stage);
+    if (peers) {
+      for (const p of peers) b.vis = p.vis;
+      peers.add(b);
+      if (b.vis) wake(b);
+    } else {
+      byStage.set(stage, /* @__PURE__ */ new Set([b]));
+      io.observe(stage);
+    }
+    tick(0, performance.now());
+    let gone = false;
+    return {
+      wake: () => {
+        if (!gone) wake(b);
+      },
+      unregister: () => {
+        if (gone) return;
+        gone = true;
+        boards = boards.filter((x) => x !== b);
+        const set = byStage.get(stage);
+        if (set) {
+          set.delete(b);
+          if (!set.size) {
+            byStage.delete(stage);
+            io?.unobserve(stage);
+          }
+        }
+        if (!boards.length) stop();
+      }
+    };
+  }
+  var handlers = /* @__PURE__ */ new WeakMap();
+  var touring = /* @__PURE__ */ new WeakMap();
+  function pointer(stage, on) {
+    handlers.set(stage, on);
+    let tm = 0;
+    const pt = (e) => {
+      const r = stage.getBoundingClientRect();
+      return [(e.clientX - r.left) / r.width * 400, (e.clientY - r.top) / r.height * 320];
+    };
+    const move = (e) => {
+      clearTimeout(tm);
+      touring.get(stage)?.hold();
+      on.move(pt(e), e);
+    };
+    const down = (e) => {
+      clearTimeout(tm);
+      touring.get(stage)?.hold();
+      if (e.pointerType !== "mouse") stage.releasePointerCapture?.(e.pointerId);
+      if (on.down) on.down(pt(e), e);
+      else on.move(pt(e), e);
+    };
+    const leave = (e) => {
+      clearTimeout(tm);
+      tm = window.setTimeout(() => {
+        on.leave(e);
+        touring.get(stage)?.release();
+      }, e.pointerType === "mouse" ? 0 : 1400);
+    };
+    stage.addEventListener("pointermove", move);
+    stage.addEventListener("pointerdown", down);
+    stage.addEventListener("pointerleave", leave);
+    return () => {
+      clearTimeout(tm);
+      if (handlers.get(stage) === on) handlers.delete(stage);
+      stage.removeEventListener("pointermove", move);
+      stage.removeEventListener("pointerdown", down);
+      stage.removeEventListener("pointerleave", leave);
+    };
+  }
+  var LAP = [[128, 150], [200, 118], [272, 150], [200, 206], null];
+  var TRAVEL = 900;
+  var DWELL = 1200;
+  var REST = 1800;
+  var RESUME = 1200;
+  var STAGGER = 450;
+  var GHOST = { pointerType: "ghost" };
+  var started = 0;
+  function entry([x, y]) {
+    const dx = x - 200, dy = y - 160;
+    if (!dx && !dy) return [200, 320];
+    const k = Math.min(dx ? (dx > 0 ? 200 : -200) / dx : Infinity, dy ? (dy > 0 ? 160 : -160) / dy : Infinity);
+    return [200 + dx * k, 160 + dy * k];
+  }
+  function tour(stage, stops, onStop) {
+    let i = 0;
+    let wait = RESUME + STAGGER * (started++ % 4);
+    let t = -1;
+    let at = null;
+    let origin = [200, 320];
+    let hand = false, keys = stage.contains(stage.ownerDocument.activeElement);
+    let gone = false;
+    const leave = () => {
+      at = null;
+      t = -1;
+      handlers.get(stage)?.leave(GHOST);
+    };
+    const tick = (dt) => {
+      if (hand || keys || !stops.length) return false;
+      if (reducedMotion()) {
+        if (at) leave();
+        return false;
+      }
+      if (wait > 0) {
+        wait -= dt * 1e3;
+        return true;
+      }
+      const stop2 = stops[i];
+      if (stop2 === null) {
+        if (at) leave();
+        onStop?.(i);
+        i = (i + 1) % stops.length;
+        wait = REST;
+        return true;
+      }
+      const h = handlers.get(stage);
+      if (!h) return true;
+      if (t < 0) {
+        origin = at ?? entry(stop2);
+        t = 0;
+      }
+      t = Math.min(TRAVEL, t + dt * 1e3);
+      const k = EASE_LIFT(t / TRAVEL);
+      at = [origin[0] + (stop2[0] - origin[0]) * k, origin[1] + (stop2[1] - origin[1]) * k];
+      h.move(at, GHOST);
+      if (t < TRAVEL) return true;
+      onStop?.(i);
+      i = (i + 1) % stops.length;
+      t = -1;
+      wait = DWELL;
+      return true;
+    };
+    const take = () => {
+      at = null;
+      t = -1;
+    };
+    const give = () => {
+      if (hand || keys) return;
+      i = 0;
+      t = -1;
+      wait = RESUME;
+      board.wake();
+    };
+    const me = {
+      hold: () => {
+        hand = true;
+        take();
+      },
+      release: () => {
+        if (!hand) return;
+        hand = false;
+        give();
+      }
+    };
+    const focusIn = () => {
+      keys = true;
+      take();
+    };
+    const focusOut = (e) => {
+      if (keys && !stage.contains(e.relatedTarget)) {
+        keys = false;
+        give();
+      }
+    };
+    stage.addEventListener("focusin", focusIn);
+    stage.addEventListener("focusout", focusOut);
+    touring.set(stage, me);
+    const board = register(stage, tick);
+    return {
+      stop: () => {
+        if (gone) return;
+        gone = true;
+        board.unregister();
+        stage.removeEventListener("focusin", focusIn);
+        stage.removeEventListener("focusout", focusOut);
+        if (touring.get(stage) === me) touring.delete(stage);
+        if (at) leave();
+      }
+    };
+  }
+  function disposer() {
+    let fns = [];
+    return {
+      add: (fn) => {
+        fns.push(fn);
+      },
+      on: (target, type, fn, opts) => {
+        const h = fn;
+        target.addEventListener(type, h, opts);
+        fns.push(() => target.removeEventListener(type, h, opts));
+      },
+      dispose: () => {
+        const run2 = fns;
+        fns = [];
+        for (let i = run2.length - 1; i >= 0; i--) run2[i]();
+      }
+    };
+  }
+
+  // packages/hairline/src/core/styles.ts
+  var LIGHT = { plate: "#ffffff", hi: "#232327", edge: "#a4a4ac", mid: "#c3c3c9", lo: "#e0e0e4" };
+  var DARK = { plate: "#08090a", hi: "#d0d6e0", edge: "#5b5d64", mid: "#3e3e44", lo: "#29292d" };
+  var KEYS = ["plate", "hi", "edge", "mid", "lo"];
+  var vars = (p) => KEYS.map((k) => `--hl-${k}:var(--hairline-${k},${p[k]});`).join("");
+  var EASE = "cubic-bezier(0.5,0,0.1,1)";
+  var SVG = ":where([data-hairline]>svg)";
+  function css(lightDark) {
+    const both = Object.fromEntries(KEYS.map((k) => [k, `light-dark(${LIGHT[k]},${DARK[k]})`]));
+    return [
+      // the box, and the palette: light unless something below says otherwise
+      `:where([data-hairline]){display:block;position:relative;aspect-ratio:5/4;touch-action:pan-y;user-select:none;-webkit-user-select:none;--hl-sw:var(--hairline-stroke,0.9);${vars(LIGHT)}}`,
+      // the page's color-scheme
+      lightDark ? `:where([data-hairline]){${vars(both)}}` : "",
+      // an ancestor that says dark
+      `:where(.dark,[data-theme="dark"]) :where([data-hairline]){${vars(DARK)}}`,
+      // the figure's own theme option
+      `:where([data-hairline][data-hairline-theme="light"]){${vars(LIGHT)}}`,
+      `:where([data-hairline][data-hairline-theme="dark"]){${vars(DARK)}}`,
+      `:where([data-hairline]:focus-visible){outline:1.5px solid var(--hl-hi);outline-offset:2px}`,
+      `${SVG}{position:absolute;inset:0;width:100%;height:100%;display:block}`,
+      // Riffle's live region: read, not seen
+      `:where([data-hairline]>[data-hairline-live]){position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}`,
+      // the drawing: plates are filled with the plate colour and painted back to front
+      `${SVG} :where(path,polygon,ellipse,line){fill:var(--hl-plate);stroke:var(--hl-mid);stroke-width:var(--hl-sw);vector-effect:non-scaling-stroke;stroke-linejoin:round;stroke-linecap:round;transition:stroke 260ms ${EASE}}`,
+      `${SVG} :where(.nf){fill:none}`,
+      `${SVG} :where(.fo){stroke:none}`,
+      `${SVG} :where(.sil){stroke:var(--hl-edge)}`,
+      `${SVG} :where(.hi){stroke:var(--hl-hi)}`,
+      `${SVG} :where(.lo){stroke:var(--hl-lo)}`,
+      `${SVG} :where(.dash){stroke-dasharray:1 3}`,
+      `${SVG} :where(.dot){stroke:none;fill:var(--hl-hi);transition:fill 260ms ${EASE}}`,
+      `${SVG} :where(.dot.m){fill:var(--hl-edge)}`,
+      `${SVG} :where(.dot.off){fill:var(--hl-lo)}`,
+      `${SVG} :where(.ghost path){fill:none;stroke:var(--hl-mid)}`
+    ].join("");
+  }
+  var done = /* @__PURE__ */ new WeakSet();
+  function inject(root) {
+    if (done.has(root)) return;
+    done.add(root);
+    const doc = root.nodeType === 9 ? root : root.ownerDocument;
+    const win = doc.defaultView;
+    const text = css(!!win?.CSS?.supports?.("color", "light-dark(#000,#fff)"));
+    if (win && "adoptedStyleSheets" in root) {
+      try {
+        const sheet = new win.CSSStyleSheet();
+        sheet.replaceSync(text);
+        root.adoptedStyleSheets = [...root.adoptedStyleSheets, sheet];
+        return;
+      } catch {
+      }
+    }
+    const style = doc.createElement("style");
+    style.setAttribute("data-hairline-style", "");
+    style.textContent = text;
+    (root.nodeType === 9 ? doc.head ?? doc.documentElement : root).appendChild(style);
+  }
+  return __toCommonJS(kernel_exports);
+})();
+/* /hairline kernel */
+
+window.HL=HL;
+(function(){let e=Object.freeze({glow:21,flow:30,saturation:69}),t=(e,t=0,n=100)=>Math.max(t,Math.min(n,e));function n(n){return!n||!Object.keys(e).every(e=>typeof n[e]==`number`&&Number.isFinite(n[e]))?null:Object.fromEntries(Object.keys(e).map(e=>[e,t(n[e])]))}function r(t,r){let i=new URLSearchParams(location.search).get(`group`)||document.referrer.split(`#`)[0]||`renevatio-preview`,a=crypto.randomUUID?.()||Math.random().toString(36).slice(2),o={...e},s=!1,c;try{c=new BroadcastChannel(`rv-background-v1:`+i)}catch{}function l(e){if(s)return;let n={rv:`background-v1`,id:a,role:t,type:e,values:o};c?.postMessage(n),parent!==window&&parent.postMessage(n,`*`)}function u(e){if(!(!e||e.rv!==`background-v1`||e.id===a)&&(t===`controls`&&e.type===`request`&&l(`values`),t===`background`&&e.role===`controls`&&e.type===`values`)){let t=n(e.values);t&&(o=t,r(t))}}c&&(c.onmessage=e=>u(e.data));let d=e=>{e.source===parent&&e.data?.relay===!0&&u(e.data)};return addEventListener(`message`,d),l(t===`controls`?`values`:`request`),{update(e){let t=n(e);t&&(o=t,l(`values`))},announce(){l(t===`controls`?`values`:`request`)},destroy(){s=!0,c?.close(),removeEventListener(`message`,d)}}}function i(n=document,i={}){let{spring:a,stepS:o,register:s,mk:c,open:l,seg:u,pointer:d,disposer:f}=window.HL,p=n.querySelector(`#panel`),m=n.querySelector(`#panel-toggle`),h=n.querySelector(`#controls-list`),g=matchMedia(`(prefers-reduced-motion: reduce)`),_=f(),v=r(`controls`,()=>{}),y={...e},b=a(0),x=a(1),S=a(1),C=a(0),w=[],T=innerWidth;try{parent!==window&&(T=parent.innerWidth)}catch{}let E=135,D=0,O=!0,k=T<=639,A=!1,j=!1;function M(e){O=!!e,p.dataset.collapsed=String(O),m.setAttribute(`aria-expanded`,String(!O)),h.inert=O,i.onToggle?.(O),N()}function N(){i.native||requestAnimationFrame(()=>{let e=Math.ceil(m.getBoundingClientRect().height),t=Math.ceil(Math.max(e,h.getBoundingClientRect().bottom));parent.postMessage({rv:`controls-layout-v1`,collapsed:O,triggerHeight:e,expandedHeight:t},`*`)})}m.addEventListener(`click`,()=>M(!O)),m.addEventListener(`keydown`,e=>{e.key===`Escape`&&!O&&(e.preventDefault(),M(!0))}),m.addEventListener(`pointermove`,e=>{let n=m.getBoundingClientRect(),r=t((e.clientX-n.left)/Math.max(1,n.width),0,1),i=t((e.clientY-n.top)/Math.max(1,n.height),0,1);A=!0,C.t=(r-.5)*3,x.t=j?.95:1.035,S.t=j?1.07:.975,m.style.setProperty(`--pill-light-x`,`${r*100}%`),m.style.setProperty(`--pill-light-y`,`${i*100}%`),R.wake()}),m.addEventListener(`pointerleave`,()=>{A=!1,j=!1,C.t=0,x.t=1,S.t=1,R.wake()}),m.addEventListener(`pointerdown`,()=>{j=!0,x.t=.95,S.t=1.07,R.wake()});let P=()=>{j=!1,x.t=A?1.035:1,S.t=A?.975:1,R.wake()};_.on(window,`pointerup`,P),_.on(window,`pointercancel`,P);function F(){p.dataset.layout=k?`wide`:`stacked`,N()}let I=new ResizeObserver(F);I.observe(p),I.observe(h),_.add(()=>I.disconnect()),_.on(window,`resize`,()=>{F(),N()}),_.on(window,`message`,e=>{e.data?.rv===`controls-set-collapsed-v1`&&M(!!e.data.collapsed),e.data?.rv===`controls-layout-context-v1`&&(k=!!e.data.mobile,F())}),F(),M(!0),requestAnimationFrame(()=>requestAnimationFrame(F));for(let n of Object.keys(e)){let r=p.querySelector(`[data-control="${n}"]`),o=r.querySelector(`.track`),s=r.querySelector(`input`),l=r.querySelector(`output`),u=c(`svg`,{viewBox:`0 0 1000 100`,preserveAspectRatio:`none`,"aria-hidden":`true`},o),f={name:n,stage:o,input:s,output:l,axis:c(`path`,{class:`lo`},u),ticks:c(`path`,{class:`lo`},u),back:c(`path`,{},u),front:c(`path`,{},u),marker:c(`path`,{class:`hi selector`},u),value:a(e[n]),reaction:a(0),reach:a(.5),hover:!1,dragging:!1,phase:0,drawn:``,numeral:null};w.push(f),s.value=e[n],s.addEventListener(`input`,()=>{let e=t(Number(s.value));y[n]=e,f.value.t=e,f.reaction.x=Math.max(.15,f.reaction.x),f.reaction.t=f.hover||f.dragging?1:0,v.update(y),i.onValues?.({...y}),R.wake()}),s.addEventListener(`pointerdown`,e=>{f.dragging=!0,f.reaction.t=1,R.wake(),e.pointerType===`touch`&&(f.hover=!1)});let m=()=>{f.dragging=!1,f.reaction.t=+!!f.hover,R.wake()};_.on(window,`pointerup`,m),_.on(window,`pointercancel`,m),_.add(d(o,{move(e){f.hover=!0,f.reach.t=t(e[0]/400,0,1),f.reaction.t=1,R.wake()},leave(){f.hover=!1,f.dragging||(f.reaction.t=0),R.wake()}})),o.addEventListener(`pointerup`,e=>{e.pointerType===`touch`&&(f.hover=!1,f.dragging=!1,f.reaction.t=0,R.wake())})}function L(e){let n=t(e.value.x),r=t(e.reaction.x,0,1),i=n/100,a=[n.toFixed(3),r.toFixed(3),e.reach.x.toFixed(3),e.phase.toFixed(3)].join(`:`);if(a===e.drawn)return;e.drawn=a;let o=[],s=[];if(e.stage.style.setProperty(`--active-opacity`,String(r)),e.front.classList.toggle(`hi`,r>.1),e.axis.setAttribute(`d`,e.name===`flow`?``:u([1,50],[999,50])),e.name===`glow`){for(let t=0;t<=300;t++){let i=t/300,a=1+998*i,c=Math.exp(-(((i-e.reach.x)/.2)**2))*r,l=(2+36*i)*(.45+.55*n/64)*(1+.16*c),u=Math.sin(i*Math.PI*10+e.phase*r)*l;o.push([a,50+u]),s.push([a,50-u])}e.front.setAttribute(`d`,l(o)),e.back.setAttribute(`d`,l(s)),e.ticks.setAttribute(`d`,Array.from({length:10},(e,t)=>u([1+998*(t+1)/11,44],[1+998*(t+1)/11,56])).join(``))}else if(e.name===`flow`){for(let t=0;t<=400;t++){let i=t/400,a=1+998*i,s=(i*2.8+i**4*4.7)*2*Math.PI*(.65+.35*n/30),c=(18+4*i)*(1+.14*r*Math.exp(-(((i-e.reach.x)/.2)**2)));o.push([a,50-Math.cos(s+e.phase*r)*c])}e.front.setAttribute(`d`,l(o)),e.back.setAttribute(`d`,``),e.ticks.setAttribute(`d`,``)}else{let t=``;for(let i=0;i<=104;i++){let a=i/104,o=1+998*a,s=(4+21*a)*(.3+.7*n/82)*(1+.18*r*Math.exp(-(((a-e.reach.x)/.15)**2)));t+=u([o,50-s],[o,50+s])}e.front.setAttribute(`d`,t),e.back.setAttribute(`d`,u([1,17],[1,83])+u([999,17],[999,83])),e.ticks.setAttribute(`d`,``)}let c=1+998*i;e.marker.setAttribute(`d`,u([c,27],[c,73]));let d=Math.round(n);d!==e.numeral&&(e.output.textContent=String(d).padStart(2,`0`),e.numeral=d)}let R=s(p,e=>{let n=!1,r=A||j;o(x,e)&&(n=!0),o(S,e)&&(n=!0),o(C,e)&&(n=!0),m.style.setProperty(`--stretch-x`,String(x.x)),m.style.setProperty(`--stretch-y`,String(S.x)),m.style.setProperty(`--pill-shift-x`,C.x+`px`);for(let i of w){let a=i.hover||i.dragging;r||=a,o(i.value,e)&&(n=!0),o(i.reaction,e)&&(n=!0),o(i.reach,e)&&(n=!0),a&&!g.matches&&(i.phase+=e*(.8+t(i.value.x)/100),n=!0),i.reaction.x===0&&(i.phase=0),L(i)}return b.t=+!!r,o(b,e)&&(n=!0),r&&!g.matches&&(E=(E+e*45)%360),p.style.setProperty(`--rim-angle`,E+`deg`),p.style.setProperty(`--rim-opacity`,String(t(b.x,0,1))),p.dataset.frames=String(++D),p.dataset.values=JSON.stringify(y),n});return _.add(R.unregister),_.add(()=>v.destroy()),_.on(window,`blur`,()=>{for(let e of w)e.hover=!1,e.dragging=!1,e.reaction.t=0;R.wake()}),_.on(g,`change`,()=>R.wake()),_.on(window,`pagehide`,e=>{e.persisted||_.dispose()}),w.forEach(L),R.wake(),{setCollapsed:M,destroy:()=>_.dispose(),values:()=>({...y})}}document.querySelector(`#panel`)&&i();var a=`@font-face{font-family:RVModica;src:url('../assets/modica-light.otf') format('opentype');font-weight:300;font-display:block}
+@font-face{font-family:RVLCD;src:url('../assets/jd-lcd-rounded.woff2') format('woff2');font-weight:400;font-display:block}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;background:transparent!important;overflow:hidden}
+:root{--rv-white:#fff;--rv-label:rgba(255,255,255,.78);--rv-line:rgba(255,255,255,.72);--rv-dim:rgba(255,255,255,.24);--rv-glass:rgba(255,255,255,.08);--rv-border:rgba(255,255,255,.24);--rv-radius:20px}
+
+/* The document is hosted in a fixed body-level portal. The trigger's original
+   Squarespace mount stays empty and fixed-height, so this tray cannot reflow it. */
+#panel{position:relative;width:100%;height:auto;min-height:0;color:var(--rv-white);isolation:isolate;container-type:inline-size}
+.glass-defs{position:absolute;pointer-events:none}
+.panel-header{position:relative;z-index:2;width:100%}
+.panel-toggle{position:relative;display:flex!important;align-items:center;width:100%;height:clamp(52px,18cqw,68px);min-width:0;padding:8px 12px;gap:12px;border:1px solid var(--rv-border);border-radius:var(--rv-radius);background:var(--rv-glass);color:#fff;cursor:pointer;overflow:hidden;box-shadow:none;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);transition:background-color .18s ease,border-color .18s ease}
+.panel-toggle:hover{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.34)}
+.panel-toggle:active{background:rgba(255,255,255,.15)}
+.panel-toggle:focus-visible{outline:1px solid #fff;outline-offset:3px}
+.pill-icon{flex:0 0 auto;display:grid;place-items:center;width:clamp(36px,12cqw,48px);height:clamp(36px,12cqw,48px);border:1px solid var(--rv-border);border-radius:14px;background:rgba(255,255,255,.06);overflow:hidden}
+.pill-icon img{display:block;width:78%;height:78%;object-fit:contain}
+.pill-label{min-width:0;flex:1;font-family:RVLCD,monospace;font-size:clamp(10px,4.1cqw,16px);font-weight:400;line-height:1;letter-spacing:.18em;text-align:left;white-space:nowrap}
+.pill-caret{flex:0 0 auto;width:11px;height:11px;margin-right:8px;border-right:1px solid currentColor;border-bottom:1px solid currentColor;transform:translateY(-2px) rotate(45deg);transition:transform .2s ease}
+#panel[data-collapsed="false"] .pill-caret{transform:translateY(3px) rotate(225deg)}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+.controls-list{position:absolute;z-index:1;top:calc(100% + 10px);left:0;width:100%;height:clamp(245px,100cqw,390px);padding:20px;display:grid;grid-template-rows:repeat(3,minmax(0,1fr));gap:12px;background:var(--rv-glass);border:1px solid var(--rv-border);border-radius:var(--rv-radius);box-shadow:none;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);transform-origin:top center;transition:opacity .18s ease,transform .18s ease,visibility .18s step-start}
+#panel[data-collapsed="true"] .controls-list{opacity:0;visibility:hidden;pointer-events:none;transform:translateY(-6px) scale(.985);transition:opacity .14s ease,transform .14s ease,visibility 0s step-end .14s}
+.control{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto minmax(0,1fr);column-gap:12px;row-gap:4px;align-items:center;min-width:0;min-height:0;margin:0;padding:0;border:0}
+.name{font-family:RVModica,sans-serif;font-weight:300;font-size:clamp(10px,4cqw,15px);letter-spacing:.17em;color:var(--rv-label);line-height:1;white-space:nowrap}
+output{font-family:RVLCD,monospace;font-weight:400;font-size:clamp(16px,7cqw,30px);line-height:1;color:#fff;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;min-width:3ch;justify-self:end;pointer-events:none;opacity:.72}
+output::after{content:'%';font-family:Arial,sans-serif;font-size:.34em;margin-left:.2em;color:var(--rv-label);vertical-align:.18em}
+.track{position:relative;grid-column:1/-1;grid-row:2;width:100%;height:100%;min-height:0;touch-action:pan-y;overflow:clip}
+.track svg{display:block;width:100%;height:100%;overflow:visible;pointer-events:none}
+.track path,.track line{fill:none;stroke:var(--rv-line);stroke-width:1;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.track .lo{stroke:var(--rv-dim)}
+.track .hi{stroke:#fff}
+.track .selector{opacity:var(--active-opacity,0)}
+.track input{appearance:none;-webkit-appearance:none;position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;opacity:0;border:0;background:transparent;cursor:ew-resize;touch-action:pan-y}
+.track input::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:1px;height:min(44px,24vh);background:transparent;border:0}
+.track input::-webkit-slider-runnable-track{height:100%;background:transparent}
+.track input::-moz-range-thumb{width:1px;height:min(44px,24vh);background:transparent;border:0}
+.track input::-moz-range-track{height:100%;background:transparent}
+.track:has(input:focus-visible){outline:1px solid #fff;outline-offset:2px;border-radius:8px}
+.dash{display:none}
+
+/* Reference mobile arrangement: three equal columns in one floating tray.
+   The parent page supplies the mode because the iframe width alone cannot
+   distinguish a narrow desktop block from a mobile viewport. */
+#panel[data-layout="wide"]{--rv-radius:16px}
+#panel[data-layout="wide"] .panel-toggle{height:52px;padding:7px 9px;gap:9px}
+#panel[data-layout="wide"] .pill-icon{width:38px;height:38px;border-radius:12px}
+#panel[data-layout="wide"] .pill-label{font-size:clamp(9px,3.8cqw,13px);letter-spacing:.14em}
+#panel[data-layout="wide"] .controls-list{height:170px;padding:14px;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:minmax(0,1fr);gap:16px}
+#panel[data-layout="wide"] .control{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);column-gap:0;row-gap:5px;align-content:stretch}
+#panel[data-layout="wide"] .name{grid-row:1;font-size:clamp(8px,2.8cqw,11px);letter-spacing:.1em;white-space:normal}
+#panel[data-layout="wide"] output{grid-row:2;justify-self:start;text-align:left;font-size:clamp(15px,5cqw,23px)}
+#panel[data-layout="wide"] .track{grid-column:1;grid-row:3}
+@media(prefers-reduced-motion:reduce){.panel-toggle,.pill-caret,.controls-list{transition:none}}
+`,o=`:host{all:initial;--rv-white:#fff;--rv-label:rgba(255,255,255,.78);--rv-line:rgba(255,255,255,.72);--rv-dim:rgba(255,255,255,.32);--rv-glass:rgba(255,255,255,.08);--rv-border:rgba(255,255,255,.24);--rv-radius:22px;display:block;color:#fff}
+.name{font-family:RVFabModica,sans-serif}
+.pill-label,output{font-family:RVFabLCD,monospace}
+#panel{position:relative;height:var(--trigger-height,68px);width:100%;container-type:inline-size;isolation:isolate;pointer-events:none}
+.panel-header{height:100%;pointer-events:auto}
+.panel-toggle,#panel[data-layout="wide"] .panel-toggle{height:100%;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+.pill-icon{border:0;background:transparent}
+.pill-caret{transform:translateY(3px) rotate(225deg)}
+#panel[data-collapsed="false"] .pill-caret{transform:translateY(-2px) rotate(45deg)}
+.controls-list,#panel[data-layout="wide"] .controls-list{position:absolute;left:0;top:auto;bottom:calc(100% + 10px);width:100%;height:auto;padding:0;display:contents;gap:0;background:transparent;border:0;border-radius:0;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;transform:none;opacity:1;visibility:visible;transition:none}
+.control,#panel[data-layout="wide"] .control{position:absolute;left:0;bottom:calc(100% + 10px + var(--slot) * 118px);display:none;width:100%;height:110px;padding:16px 20px;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto minmax(0,1fr);gap:5px 12px;border:1px solid var(--rv-border);border-radius:var(--rv-radius);background:var(--rv-glass);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);box-shadow:none;opacity:0;translate:0 16px;scale:.8;transform-origin:center bottom;pointer-events:none;transition:opacity .3s ease,translate .36s cubic-bezier(.2,.8,.2,1),scale .36s cubic-bezier(.2,.8,.2,1),display .36s allow-discrete;transition-delay:0s}
+.control[data-control="glow"]{--slot:2}
+.control[data-control="flow"]{--slot:1}
+.control[data-control="saturation"]{--slot:0}
+#panel[data-collapsed="false"] .control{display:grid;opacity:1;translate:0 0;scale:1;pointer-events:auto;transition-delay:calc(var(--slot) * 60ms)}
+#panel[data-collapsed="true"] .controls-list{opacity:1;visibility:visible;transform:none;pointer-events:none;transition:none}
+#panel[data-side="below"] .control{bottom:auto;top:calc(100% + 10px + (2 - var(--slot)) * 118px);transform-origin:center top;translate:0 -16px}
+#panel[data-side="below"][data-collapsed="false"] .control{translate:0 0;transition-delay:calc((2 - var(--slot)) * 60ms)}
+#panel[data-layout="wide"] .control{left:calc(var(--column) * (100% + 8px) / 3);bottom:calc(100% + 10px);top:auto;width:calc((100% - 16px) / 3);height:142px;padding:12px 10px;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);gap:5px;--slot:var(--column)}
+#panel[data-layout="wide"] .control[data-control="glow"]{--column:0}
+#panel[data-layout="wide"] .control[data-control="flow"]{--column:1}
+#panel[data-layout="wide"] .control[data-control="saturation"]{--column:2}
+#panel[data-layout="wide"][data-side="below"] .control{top:calc(100% + 10px);bottom:auto}
+#panel[data-layout="wide"] .name{grid-row:1;font-size:clamp(8px,2.8cqw,11px);letter-spacing:.08em}
+#panel[data-layout="wide"] output{grid-row:2;justify-self:start;text-align:left;font-size:22px}
+#panel[data-layout="wide"] .track{grid-row:3;grid-column:1}
+.track{min-height:44px}
+#panel[data-layout="wide"] .track{min-height:44px}
+#panel[data-layout="wide"] .track path{stroke-width:.6}
+@starting-style{
+ #panel[data-collapsed="false"] .control{opacity:0;translate:0 16px;scale:.8}
+ #panel[data-side="below"][data-collapsed="false"] .control{translate:0 -16px}
+}
+@media(prefers-reduced-motion:reduce){.control,#panel[data-collapsed="false"] .control{transition:none;transition-delay:0s}}
+`;let s=document.currentScript?.src||new URL(`../background/controls-fab.js`,location.href).href,c=new URL(`assets/`,s).href,l=new Map,u=Promise.all([new FontFace(`RVFabModica`,`url('${c}modica-light.otf')`,{weight:`300`}),new FontFace(`RVFabLCD`,`url('${c}jd-lcd-rounded.woff2')`,{weight:`400`})].map(e=>e.load().then(e=>document.fonts.add(e)))),d=Object.entries(e).map(([e,t])=>`<section class="control" data-control="${e}"><label class="name" for="${e}">${e.toUpperCase()}</label><div class="track"><input id="${e}" type="range" min="0" max="100" step="1" value="${t}" aria-label="${e}"></div><output for="${e}" aria-hidden="true">${t}</output></section>`).join(``);function f(e){let t={rv:`background-v1`,id:`rv-native-motion-v6`,role:`controls`,type:`values`,values:e,relay:!0};document.querySelectorAll(`iframe`).forEach(e=>{let n=e.getAttribute(`src`)||``;(e.closest(`[data-rv-embed="background"]`)||/renevatio-column-embed\/background\/(?:v2\/)?background\.html/.test(n))&&e.contentWindow?.postMessage(t,`*`)})}function p(t){if(l.has(t))return;let n=document.createElement(`div`);n.setAttribute(`data-rv-motion-overlay`,`v6`),n.setAttribute(`popover`,`manual`),n.style.cssText=`position:fixed;inset:auto;margin:0;padding:0;border:0;background:transparent;overflow:visible;pointer-events:none;max-width:none;max-height:none;box-sizing:border-box;`;let r=n.attachShadow({mode:`open`});r.innerHTML=`<style>${a.replace(/@font-face\{[^}]*\}/g,``)}${o}</style><div id="panel" data-collapsed="true" role="group" aria-label="Motion controls"><header class="panel-header"><button id="panel-toggle" class="panel-toggle" type="button" aria-expanded="false" aria-controls="controls-list"><span class="pill-icon"><img src="${c}motion-controls-icon.png" alt=""></span><span class="pill-label">MOTION CONTROLS</span><span class="pill-caret" aria-hidden="true"></span></button></header><div id="controls-list" class="controls-list">${d}</div></div>`,r.querySelector(`style`).textContent+=`:host::backdrop{background:transparent;pointer-events:none}`,document.body.append(n);let s=r.querySelector(`#panel`),p={anchor:t,host:n,shadow:r,panel:s,api:null};l.set(t,p),p.api=i(r,{native:!0,onValues:f}),p.api.setCollapsed(!0),u.then(()=>s.dataset.fontsReady=`true`).catch(()=>s.dataset.fontsReady=`fallback`);let h=new ResizeObserver(g);h.observe(t),p.resize=h,m(p),typeof n.showPopover==`function`?n.showPopover():n.removeAttribute(`popover`),f(e)}function m(e){let{anchor:t,host:n,panel:r}=e;if(!t.isConnected){e.api.destroy(),e.resize.disconnect(),n.remove(),l.delete(t);return}let i=t.getBoundingClientRect(),a=innerWidth<=639,o=a?152:356;n.style.left=i.left+`px`,n.style.top=i.top+`px`,n.style.width=i.width+`px`,n.style.height=i.height+`px`,n.style.visibility=i.width&&i.height&&i.bottom>0&&i.top<innerHeight?`visible`:`hidden`,r.style.setProperty(`--trigger-height`,i.height+`px`),r.dataset.layout=a?`wide`:`stacked`,r.dataset.side=i.top>=o||innerHeight-i.bottom<o?`above`:`below`}let h=!1;function g(){h||(h=!0,requestAnimationFrame(()=>{h=!1,l.forEach(m)}))}function _(){document.querySelectorAll(`[data-rv-motion-anchor]`).forEach(p),g()}function v(){window.__rvMotionNativeV6||(window.__rvMotionNativeV6=!0,_(),addEventListener(`scroll`,g,{capture:!0,passive:!0}),addEventListener(`resize`,g,{passive:!0}),addEventListener(`keydown`,e=>{e.key===`Escape`&&l.forEach(e=>e.api.setCollapsed(!0))}),document.addEventListener(`pointerdown`,e=>{l.forEach(t=>{e.composedPath().includes(t.host)||t.api.setCollapsed(!0)})}),addEventListener(`message`,e=>{e.data?.rv===`background-v1`&&e.data.type===`request`&&l.forEach(e=>f(e.api.values()))}),new MutationObserver(_).observe(document.body,{childList:!0,subtree:!0}))}document.readyState===`loading`?document.addEventListener(`DOMContentLoaded`,v,{once:!0}):v()})();
+})();
